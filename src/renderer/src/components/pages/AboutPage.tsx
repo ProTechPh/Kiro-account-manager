@@ -34,7 +34,6 @@ export function AboutPage() {
   const [showUpdateModal, setShowUpdateModal] = useState(false)
   const { darkMode } = useAccountsStore()
   const { t } = useTranslation()
-  const isEn = t('common.unknown') === 'Unknown'
 
   useEffect(() => {
     window.api.getAppVersion().then(setVersion)
@@ -82,8 +81,8 @@ export function AboutPage() {
             className={cn("h-20 w-auto mx-auto transition-all", darkMode && "invert brightness-0")} 
           />
           <div>
-            <h1 className="text-2xl font-bold text-primary">{isEn ? 'Kiro Account Manager' : 'Kiro 账户管理器'}</h1>
-            <p className="text-muted-foreground">{isEn ? `Version ${version}` : `版本 ${version}`}</p>
+            <h1 className="text-2xl font-bold text-primary">{t('about.appName')}</h1>
+            <p className="text-muted-foreground">{t('about.versionLabel', { version })}</p>
           </div>
         <div className="flex gap-2 justify-center flex-wrap">
           <Button
@@ -94,7 +93,7 @@ export function AboutPage() {
             disabled={isCheckingUpdate}
           >
             <RefreshCw className={cn("h-4 w-4", isCheckingUpdate && "animate-spin")} />
-            {isCheckingUpdate ? (isEn ? 'Checking...' : '检查中...') : (isEn ? 'Check Updates' : '检查更新')}
+            {isCheckingUpdate ? t('about.checkingUpdate') : t('about.checkUpdates')}
           </Button>
           <Button
             variant="outline"
@@ -103,29 +102,29 @@ export function AboutPage() {
             onClick={() => setShowGroupQR(true)}
           >
             <MessageCircle className="h-4 w-4" />
-            {isEn ? 'Join Group' : '加入交流群'}
+            {t('about.joinGroup')}
           </Button>
         </div>
-        
+
         {/* SmartLink Support Button */}
         {adConfig.smartlink.enabled && (
           <div className="mt-4">
-            <SmartLinkAd 
+            <SmartLinkAd
               url={adConfig.smartlink.url}
-              text={isEn ? '💖 Support Development' : '💖 支持开发'}
+              text={t('about.supportDev')}
               className="max-w-xs mx-auto"
             />
           </div>
         )}
-        
+
         {/* 更新提示 */}
         {updateInfo?.hasUpdate && !showUpdateModal && (
-          <div 
+          <div
             className="inline-flex items-center gap-2 px-3 py-1.5 bg-primary/10 text-primary rounded-full text-sm cursor-pointer hover:bg-primary/20"
             onClick={() => setShowUpdateModal(true)}
           >
             <Download className="h-4 w-4" />
-            {isEn ? `New version v${updateInfo.latestVersion}` : `发现新版本 v${updateInfo.latestVersion}`}
+            {t('about.newVersionBadge', { version: updateInfo.latestVersion })}
           </div>
         )}
         </div>
@@ -151,34 +150,34 @@ export function AboutPage() {
                       <Download className="h-6 w-6 text-green-500" />
                     </div>
                     <div>
-                      <h3 className="font-semibold text-lg">{isEn ? 'New Version Available' : '发现新版本'}</h3>
+                      <h3 className="font-semibold text-lg">{t('about.newVersionAvailable')}</h3>
                       <p className="text-sm text-muted-foreground">
                         {updateInfo.currentVersion} → {updateInfo.latestVersion}
                       </p>
                     </div>
                   </div>
-                  
+
                   <div className="bg-muted/50 rounded-lg p-3">
                     <p className="text-sm font-medium mb-2">{updateInfo.releaseName}</p>
                     {updateInfo.publishedAt && (
                       <p className="text-xs text-muted-foreground">
-                        {isEn ? `Released: ${new Date(updateInfo.publishedAt).toLocaleDateString('en-US')}` : `发布时间: ${new Date(updateInfo.publishedAt).toLocaleDateString('zh-CN')}`}
+                        {t('about.releasedOn', { date: new Date(updateInfo.publishedAt).toLocaleDateString() })}
                       </p>
                     )}
                   </div>
-                  
+
                   {updateInfo.releaseNotes && (
                     <div className="space-y-2">
-                      <p className="text-sm font-medium">{isEn ? 'Release Notes:' : '更新内容:'}</p>
+                      <p className="text-sm font-medium">{t('about.releaseNotesLabel')}</p>
                       <div className="text-sm text-muted-foreground bg-muted/30 rounded-lg p-3 max-h-32 overflow-y-auto whitespace-pre-wrap">
                         {updateInfo.releaseNotes}
                       </div>
                     </div>
                   )}
-                  
+
                   {updateInfo.assets && updateInfo.assets.length > 0 && (
                     <div className="space-y-2">
-                      <p className="text-sm font-medium">{isEn ? 'Download Files:' : '下载文件:'}</p>
+                      <p className="text-sm font-medium">{t('about.downloadFiles')}</p>
                       <div className="space-y-1 max-h-32 overflow-y-auto">
                         {updateInfo.assets.slice(0, 6).map((asset, i) => (
                           <div key={i} className="flex items-center justify-between text-xs bg-muted/30 rounded px-2 py-1">
@@ -188,16 +187,16 @@ export function AboutPage() {
                         ))}
                         {updateInfo.assets.length > 6 && (
                           <p className="text-xs text-muted-foreground text-center">
-                            {isEn ? `${updateInfo.assets.length - 6} more files...` : `还有 ${updateInfo.assets.length - 6} 个文件...`}
+                            {t('about.moreFiles', { n: updateInfo.assets.length - 6 })}
                           </p>
                         )}
                       </div>
                     </div>
                   )}
-                  
+
                   <Button className="w-full gap-2" onClick={openReleasePage}>
                     <ExternalLink className="h-4 w-4" />
-                    {isEn ? 'Go to Download Page' : '前往下载页面'}
+                    {t('about.goToDownload')}
                   </Button>
                 </>
               ) : updateInfo.error ? (
@@ -207,12 +206,12 @@ export function AboutPage() {
                       <AlertCircle className="h-6 w-6 text-red-500" />
                     </div>
                     <div>
-                      <h3 className="font-semibold text-lg">{isEn ? 'Check Failed' : '检查更新失败'}</h3>
+                      <h3 className="font-semibold text-lg">{t('about.checkFailed')}</h3>
                       <p className="text-sm text-muted-foreground">{updateInfo.error}</p>
                     </div>
                   </div>
                   <Button variant="outline" className="w-full" onClick={() => checkForUpdates(true)}>
-                    {isEn ? 'Retry' : '重试'}
+                    {t('about.retry')}
                   </Button>
                 </>
               ) : (
@@ -222,9 +221,9 @@ export function AboutPage() {
                       <CheckCircle className="h-6 w-6 text-green-500" />
                     </div>
                     <div>
-                      <h3 className="font-semibold text-lg">{isEn ? 'Up to Date' : '已是最新版本'}</h3>
+                      <h3 className="font-semibold text-lg">{t('about.upToDateTitle')}</h3>
                       <p className="text-sm text-muted-foreground">
-                        {isEn ? `Version v${updateInfo.currentVersion} is the latest` : `当前版本 v${updateInfo.currentVersion} 已经是最新的了`}
+                        {t('about.upToDateDesc', { version: updateInfo.currentVersion })}
                       </p>
                     </div>
                   </div>
@@ -247,11 +246,11 @@ export function AboutPage() {
               <X className="h-5 w-5" />
             </button>
             <div className="text-center space-y-3">
-              <h3 className="font-semibold text-lg">{isEn ? 'Join Group' : '扫码加入交流群'}</h3>
+              <h3 className="font-semibold text-lg">{t('about.joinGroupTitle')}</h3>
               <div className="bg-[#07C160]/5 rounded-xl p-3 border border-[#07C160]/20">
                 <img src={groupQR} alt="Group" className="w-48 h-48 object-contain" />
               </div>
-              <p className="text-sm text-muted-foreground">{isEn ? 'Scan with WeChat' : 'QQ 扫码加入'}</p>
+              <p className="text-sm text-muted-foreground">{t('about.scanQR')}</p>
             </div>
           </div>
         </div>
@@ -264,20 +263,12 @@ export function AboutPage() {
             <div className="p-2 rounded-lg bg-primary/10">
               <Info className="h-4 w-4 text-primary" />
             </div>
-            {isEn ? 'About' : '关于本应用'}
+            {t('about.aboutTitle')}
           </CardTitle>
         </CardHeader>
         <CardContent className="text-sm text-muted-foreground space-y-3">
-          <p>
-            {isEn 
-              ? 'Kiro Account Manager is a powerful multi-account management tool for Kiro IDE. It supports quick account switching, auto token refresh, and group/tag management.'
-              : 'Kiro 账户管理器是一个功能强大的 Kiro IDE 多账号管理工具。支持多账号快速切换、自动 Token 刷新、分组标签管理等功能，帮助你高效管理和使用多个 Kiro 账号。'}
-          </p>
-          <p>
-            {isEn 
-              ? 'Built with Electron + React + TypeScript, supporting Windows, macOS and Linux. All data is stored locally to protect your privacy.'
-              : '本应用使用 Electron + React + TypeScript 开发，支持 Windows、macOS 和 Linux 平台。所有数据均存储在本地，保护你的隐私安全。'}
-          </p>
+          <p>{t('about.aboutDesc1')}</p>
+          <p>{t('about.aboutDesc2')}</p>
         </CardContent>
       </Card>
 
@@ -288,66 +279,66 @@ export function AboutPage() {
             <div className="p-2 rounded-lg bg-primary/10">
               <Zap className="h-4 w-4 text-primary" />
             </div>
-            {isEn ? 'Features' : '主要功能'}
+            {t('about.featuresTitle')}
           </CardTitle>
         </CardHeader>
         <CardContent>
           <ul className="space-y-2 text-sm text-muted-foreground">
             <li className="flex items-start gap-2">
               <span className="text-primary mt-0.5">✓</span>
-              <strong>{isEn ? 'Multi-Account' : '多账号管理'}</strong>{isEn ? ': Add, edit, delete multiple accounts' : '：支持添加、编辑、删除多个 Kiro 账号'}
+              <strong>{t('about.featureMultiAccount')}</strong>{t('about.featureMultiAccountDesc')}
             </li>
             <li className="flex items-start gap-2">
               <span className="text-primary mt-0.5">✓</span>
-              <strong>{isEn ? 'One-Click Switch' : '一键切换'}</strong>{isEn ? ': Quick account switching' : '：快速切换当前使用的账号'}
+              <strong>{t('about.featureOneClick')}</strong>{t('about.featureOneClickDesc')}
             </li>
             <li className="flex items-start gap-2">
               <span className="text-primary mt-0.5">✓</span>
-              <strong>{isEn ? 'Auto Refresh' : '自动刷新'}</strong>{isEn ? ': Auto refresh tokens before expiry' : '：Token 过期前自动刷新，保持登录状态'}
+              <strong>{t('about.featureAutoRefresh')}</strong>{t('about.featureAutoRefreshDesc')}
             </li>
             <li className="flex items-start gap-2">
               <span className="text-primary mt-0.5">✓</span>
-              <strong>{isEn ? 'Groups & Tags' : '分组与标签'}</strong>{isEn ? ': Batch set groups/tags' : '：多选账户批量设置分组/标签，支持多标签'}
+              <strong>{t('about.featureGroupsTags')}</strong>{t('about.featureGroupsTagsDesc')}
             </li>
             <li className="flex items-start gap-2">
               <span className="text-primary mt-0.5">✓</span>
-              <strong>{isEn ? 'Privacy Mode' : '隐私模式'}</strong>{isEn ? ': Hide sensitive info' : '：隐藏邮箱和账号敏感信息'}
+              <strong>{t('about.featurePrivacy')}</strong>{t('about.featurePrivacyDesc')}
             </li>
             <li className="flex items-start gap-2">
               <span className="text-primary mt-0.5">✓</span>
-              <strong>{isEn ? 'Batch Import' : '批量导入'}</strong>{isEn ? ': SSO Token & OIDC batch import' : '：支持 SSO Token 和 OIDC 凭证批量导入'}
+              <strong>{t('about.featureBatchImport')}</strong>{t('about.featureBatchImportDesc')}
             </li>
             <li className="flex items-start gap-2">
               <span className="text-primary mt-0.5">✓</span>
-              <strong>{isEn ? 'Auto Import' : '自动导入'}</strong>{isEn ? ': Auto-detect and import credentials from cache' : '：自动检测并导入缓存中的凭证'}
+              <strong>{t('about.featureAutoImport')}</strong>{t('about.featureAutoImportDesc')}
             </li>
             <li className="flex items-start gap-2">
               <span className="text-primary mt-0.5">✓</span>
-              <strong>{isEn ? 'Auto Switch' : '自动换号'}</strong>{isEn ? ': Switch when balance low' : '：余额不足时自动切换可用账号'}
+              <strong>{t('about.featureAutoSwitch')}</strong>{t('about.featureAutoSwitchDesc')}
             </li>
             <li className="flex items-start gap-2">
               <span className="text-primary mt-0.5">✓</span>
-              <strong>{isEn ? 'API Proxy Service' : 'API 反代服务'}</strong>{isEn ? ': OpenAI-compatible API gateway with auto account rotation' : '：OpenAI 兼容的 API 网关，支持自动账号轮换'}
+              <strong>{t('about.featureApiProxy')}</strong>{t('about.featureApiProxyDesc')}
             </li>
             <li className="flex items-start gap-2">
               <span className="text-primary mt-0.5">✓</span>
-              <strong>{isEn ? 'Chat Interface' : '聊天界面'}</strong>{isEn ? ': Built-in chat with conversation management and AI title generation' : '：内置聊天界面，支持对话管理和 AI 标题生成'}
+              <strong>{t('about.featureChat')}</strong>{t('about.featureChatDesc')}
             </li>
             <li className="flex items-start gap-2">
               <span className="text-primary mt-0.5">✓</span>
-              <strong>{isEn ? 'System Logs' : '系统日志'}</strong>{isEn ? ': Real-time log streaming with color-coded levels' : '：实时日志流，支持颜色分级显示'}
+              <strong>{t('about.featureLogs')}</strong>{t('about.featureLogsDesc')}
             </li>
             <li className="flex items-start gap-2">
               <span className="text-primary mt-0.5">✓</span>
-              <strong>{isEn ? 'API Examples' : 'API 示例'}</strong>{isEn ? ': Code examples and CC Switch integration for easy setup' : '：代码示例和 CC Switch 集成，快速配置'}
+              <strong>{t('about.featureApiExamples')}</strong>{t('about.featureApiExamplesDesc')}
             </li>
             <li className="flex items-start gap-2">
               <span className="text-primary mt-0.5">✓</span>
-              <strong>{isEn ? 'Proxy Support' : '代理支持'}</strong>{isEn ? ': HTTP/HTTPS/SOCKS5' : '：支持 HTTP/HTTPS/SOCKS5 代理'}
+              <strong>{t('about.featureProxy')}</strong>{t('about.featureProxyDesc')}
             </li>
             <li className="flex items-start gap-2">
               <span className="text-primary mt-0.5">✓</span>
-              <strong>{isEn ? 'Themes' : '主题定制'}</strong>{isEn ? ': Dark/light mode with modern design' : '：深色/浅色模式，现代化设计'}
+              <strong>{t('about.featureThemes')}</strong>{t('about.featureThemesDesc')}
             </li>
           </ul>
         </CardContent>
@@ -360,7 +351,7 @@ export function AboutPage() {
             <div className="p-2 rounded-lg bg-primary/10">
               <Code className="h-4 w-4 text-primary" />
             </div>
-            {isEn ? 'Tech Stack' : '技术栈'}
+            {t('about.techStackTitle')}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -384,7 +375,7 @@ export function AboutPage() {
             <div className="p-2 rounded-lg bg-primary/10">
               <User className="h-4 w-4 text-primary" />
             </div>
-            {isEn ? 'Author' : '作者'}
+            {t('about.authorTitle')}
           </CardTitle>
         </CardHeader>
         <CardContent>

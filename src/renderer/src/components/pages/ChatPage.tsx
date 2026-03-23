@@ -29,7 +29,6 @@ interface ModelInfo {
 
 export function ChatPage() {
   const { t } = useTranslation()
-  const isEn = t('common.unknown') === 'Unknown'
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null)
   const [message, setMessage] = useState('')
@@ -111,89 +110,18 @@ export function ChatPage() {
     }
   }
 
-  // Fetch models from proxy server via HTTP API
-  const fetchModelsFromProxy = async () => {
-    try {
-      const response = await fetch('http://127.0.0.1:5580/v1/models', {
-        method: 'GET',
-        headers: {
-          'Authorization': 'Bearer dummy-key'
-        }
-      })
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-      }
-
-      const data = await response.json()
-      console.log('Models from proxy API:', data)
-      
-      if (data.data && Array.isArray(data.data)) {
-        console.log('Raw models from API:', data.data.map(m => m.id))
-        const models = data.data
-          .map((model: any) => ({
-            id: model.id,
-            name: model.id.replace(/^anthropic\./, '').replace(/-v\d+:\d+$/, '').replace(/-/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()),
-            description: model.id
-          }))
-        console.log('Filtered models:', models.map(m => m.id))
-        return models
-      }
-      return []
-    } catch (error) {
-      console.error('Error fetching models from proxy:', error)
-      return []
-    }
-  }
-
   // Fetch available models
   const fetchModels = async () => {
     try {
       setIsLoadingModels(true)
-      console.log('Fetching models...')
-      
-      let models: ModelInfo[] = []
-      
-      // Try to fetch from proxy HTTP API first
-      if (isServerOnline) {
-        models = await fetchModelsFromProxy()
-      }
-      
-      // If no models from HTTP API, try the IPC API
-      if (models.length === 0) {
-        try {
-          const result = await window.api.proxyGetModels()
-          console.log('Models from IPC API:', result)
-          
-          if (result.success && result.models && result.models.length > 0) {
-            models = result.models
-          }
-        } catch (error) {
-          console.error('IPC API failed:', error)
-        }
-      }
-      
-      // Only use fetched models - no hardcoded fallback
-      if (models.length === 0) {
-        console.warn('No models available from API')
-        setAvailableModels([])
-        return
-      }
-      
+      const result = await window.api.proxyGetModels()
+      const models: ModelInfo[] = (result.success && result.models?.length > 0) ? result.models : []
       setAvailableModels(models)
-      console.log('Final available models:', models)
-      console.log('Current selectedModel before update:', selectedModel)
-      
-      // Set default model if none selected or if current selection is invalid
-      if (!selectedModel || !models.some(m => m.id === selectedModel)) {
-        if (models.length > 0) {
-          setSelectedModel(models[0].id)
-          console.log('Set default model:', models[0].id)
-        }
+      if (models.length > 0 && (!selectedModel || !models.some((m: ModelInfo) => m.id === selectedModel))) {
+        setSelectedModel(models[0].id)
       }
     } catch (error) {
       console.error('Error fetching models:', error)
-      // No fallback - just set empty array
       setAvailableModels([])
     } finally {
       setIsLoadingModels(false)
@@ -217,7 +145,7 @@ export function ChatPage() {
     
     const newConversation: Conversation = {
       id: Date.now().toString(),
-      title: isEn ? 'New Chat' : '新对话',
+      title: t('chat.newChat'),
       messages: [],
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -421,7 +349,7 @@ Title:`
                 ...conv,
                 messages: [...conv.messages, userMessage],
                 // Only update title if it's still the default "New Chat" title
-                title: (conv.title === (isEn ? 'New Chat' : '新对话') && conv.messages.length === 0) 
+                title: (conv.title === t('chat.newChat') && conv.messages.length === 0)
                   ? message.trim().slice(0, 30) + (message.trim().length > 30 ? '...' : '') 
                   : conv.title,
                 updatedAt: new Date(),
@@ -433,7 +361,7 @@ Title:`
         // Create new conversation if none exists
         const newConversation: Conversation = {
           id: Date.now().toString(),
-          title: isEn ? 'New Chat' : '新对话', // Temporary title, will be updated after first response
+          title: t('chat.newChat'), // Temporary title, will be updated after first response
           messages: [userMessage],
           createdAt: new Date(),
           updatedAt: new Date(),
@@ -500,7 +428,7 @@ Title:`
           
           // Always try to generate title for conversations with default titles
           const currentConv = conversations.find(c => c.id === currentActiveConversationId)
-          const hasDefaultTitle = currentConv && (currentConv.title === (isEn ? 'New Chat' : '新对话'))
+          const hasDefaultTitle = currentConv && (currentConv.title === t('chat.newChat'))
           const isFirstResponse = currentConv && currentConv.messages.length === 1
           
           if (hasDefaultTitle || isFirstResponse) {
@@ -616,12 +544,13 @@ Title:`
 
   // Load conversations and check server status on mount
   useEffect(() => {
-    console.log('ChatPage mounted, loading conversations and checking server status')
     loadConversations()
     checkServerStatus()
     fetchModels()
-    const interval = setInterval(checkServerStatus, 5000)
-    return () => clearInterval(interval)
+    const unsubscribe = window.api.onProxyStatusChange?.((status) => {
+      setIsServerOnline(status.running)
+    })
+    return () => unsubscribe?.()
   }, [])
 
   // Ensure selectedModel is set when availableModels are loaded
@@ -706,8 +635,8 @@ Title:`
             <MessageCircle className="h-6 w-6 text-primary-foreground" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-primary">{isEn ? 'Chat' : '对话'}</h1>
-            <p className="text-muted-foreground">{isEn ? 'AI-powered conversations through your proxy.' : '通过代理服务器进行AI对话'}</p>
+            <h1 className="text-2xl font-bold text-primary">{t('chat.title')}</h1>
+            <p className="text-muted-foreground">{t('chat.description')}</p>
           </div>
         </div>
       </div>
@@ -720,7 +649,7 @@ Title:`
             {/* Sidebar Header */}
             <div className="p-4 border-b">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold">{isEn ? 'Chat' : '对话'}</h3>
+                <h3 className="font-semibold">{t('chat.title')}</h3>
                 <Button
                   variant="outline"
                   size="sm"
@@ -729,7 +658,7 @@ Title:`
                   className="gap-2"
                 >
                   <Plus className="h-4 w-4" />
-                  {isEn ? 'New Chat' : '新对话'}
+                  {t('chat.newChat')}
                 </Button>
               </div>
             </div>
@@ -739,7 +668,7 @@ Title:`
               {conversations.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
                   <MessageCircle className="h-12 w-12 mb-4 opacity-50" />
-                  <p className="text-sm text-center">{isEn ? 'No conversations yet' : '暂无对话'}</p>
+                  <p className="text-sm text-center">{t('chat.noConversations')}</p>
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -767,7 +696,7 @@ Title:`
                           )}
                         </div>
                         <div className="text-xs text-muted-foreground flex items-center justify-between">
-                          <span>{conv.messages.length} {isEn ? 'messages' : '条消息'}</span>
+                          <span>{conv.messages.length} {t('chat.messages', { n: conv.messages.length }).replace(/\d+ /, '')}</span>
                           <span className="text-xs bg-muted/50 px-2 py-0.5 rounded">
                             {availableModels.find(m => m.id === conv.model)?.name?.split(' ')[0] || conv.model.split('-')[0] || 'Model'}
                           </span>
@@ -777,14 +706,14 @@ Title:`
                       {/* Action Buttons */}
                       <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
                         {/* Regenerate Title Button - only show for conversations with generic titles */}
-                        {(conv.title === 'hi' || conv.title === 'hello' || conv.title.length < 4 || conv.title === (isEn ? 'New Chat' : '新对话')) && conv.messages.length >= 2 && (
+                        {(conv.title === 'hi' || conv.title === 'hello' || conv.title.length < 4 || conv.title === t('chat.newChat')) && conv.messages.length >= 2 && (
                           <button
                             onClick={(e) => {
                               e.stopPropagation()
                               regenerateTitle(conv.id)
                             }}
                             className="p-1 rounded hover:bg-primary/10 hover:text-primary transition-all"
-                            title={isEn ? 'Regenerate title' : '重新生成标题'}
+                            title={t('chat.regenerateTitle')}
                           >
                             <RefreshCw className="h-3 w-3" />
                           </button>
@@ -797,7 +726,7 @@ Title:`
                             confirmDeleteConversation(conv.id)
                           }}
                           className="p-1 rounded hover:bg-red-500/10 hover:text-red-500 transition-all"
-                          title={isEn ? 'Delete conversation' : '删除对话'}
+                          title={t('chat.deleteConversation')}
                         >
                           <Trash2 className="h-3 w-3" />
                         </button>
@@ -816,8 +745,8 @@ Title:`
               <div className="flex-1 flex items-center justify-center">
                 <div className="text-center text-muted-foreground">
                   <WifiOff className="h-16 w-16 mx-auto mb-4 opacity-50" />
-                  <h3 className="text-lg font-medium mb-2">{isEn ? 'Server offline' : '服务器离线'}</h3>
-                  <p className="text-sm">{isEn ? 'Please start the server first' : '请先启动服务器'}</p>
+                  <h3 className="text-lg font-medium mb-2">{t('chat.serverOffline')}</h3>
+                  <p className="text-sm">{t('chat.serverOfflineDesc')}</p>
                 </div>
               </div>
             ) : !activeConversation ? (
@@ -825,11 +754,11 @@ Title:`
               <div className="flex-1 flex items-center justify-center">
                 <div className="text-center text-muted-foreground">
                   <MessageCircle className="h-16 w-16 mx-auto mb-4 opacity-50" />
-                  <h3 className="text-lg font-medium mb-2">{isEn ? 'Select a conversation' : '选择一个对话'}</h3>
-                  <p className="text-sm mb-4">{isEn ? 'Choose a chat or start a new one' : '选择一个对话或开始新对话'}</p>
+                  <h3 className="text-lg font-medium mb-2">{t('chat.selectConversation')}</h3>
+                  <p className="text-sm mb-4">{t('chat.selectConversationDesc')}</p>
                   <Button onClick={createNewConversation} disabled={!isServerOnline} className="gap-2">
                     <Plus className="h-4 w-4" />
-                    {isEn ? 'New Chat' : '新对话'}
+                    {t('chat.newChat')}
                   </Button>
                 </div>
               </div>
@@ -870,7 +799,7 @@ Title:`
                             <div className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
                             <div className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
                           </div>
-                          <span className="text-xs text-muted-foreground">{isEn ? 'Thinking...' : '思考中...'}</span>
+                          <span className="text-xs text-muted-foreground">{t('chat.thinking')}</span>
                         </div>
                       </div>
                     </div>
@@ -887,7 +816,7 @@ Title:`
                         value={message}
                         onChange={handleTextareaChange}
                         onKeyDown={handleKeyDown}
-                        placeholder={isEn ? 'Type your message...' : '输入您的消息...'}
+                        placeholder={t('chat.placeholder')}
                         className="w-full resize-none rounded-xl border bg-background px-4 py-3 pr-12 text-sm focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary min-h-[48px] max-h-[120px]"
                         rows={1}
                       />
@@ -909,7 +838,7 @@ Title:`
                         <>
                           <div className="flex items-center gap-2">
                             <Wifi className="h-3 w-3 text-green-500" />
-                            <span>{isEn ? 'Online' : '在线'}</span>
+                            <span>{t('chat.online')}</span>
                           </div>
                           {/* Model Selector */}
                           <div className="relative" ref={modelDropdownRef}>
@@ -919,8 +848,8 @@ Title:`
                               disabled={isLoadingModels || availableModels.length === 0}
                             >
                               <span className="font-medium">
-                                {isLoadingModels 
-                                  ? (isEn ? 'Loading...' : '加载中...') 
+                                {isLoadingModels
+                                  ? t('chat.loading')
                                   : (currentModel?.name || (availableModels.length > 0 ? availableModels[0].name : 'No Models'))
                                 }
                               </span>
@@ -931,7 +860,7 @@ Title:`
                               <div className="absolute bottom-full left-0 mb-2 w-64 bg-popover border rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto">
                                 <div className="p-2 border-b flex items-center justify-between">
                                   <span className="text-xs font-medium text-muted-foreground">
-                                    {isEn ? 'Available Models' : '可用模型'}
+                                    {t('chat.availableModels')}
                                   </span>
                                   <Button
                                     variant="ghost"
@@ -956,7 +885,7 @@ Title:`
                                 ))}
                                 {availableModels.length === 0 && (
                                   <div className="px-3 py-2 text-sm text-muted-foreground text-center">
-                                    {isEn ? 'No models available' : '暂无可用模型'}
+                                    {t('chat.noModels')}
                                   </div>
                                 )}
                               </div>
@@ -966,12 +895,12 @@ Title:`
                       ) : (
                         <>
                           <WifiOff className="h-3 w-3 text-red-500" />
-                          <span>{isEn ? 'Server offline' : '服务器离线'}</span>
+                          <span>{t('chat.offline')}</span>
                         </>
                       )}
                     </div>
                     <div>
-                      {isEn ? 'Press Enter to send, Shift+Enter for new line' : '按 Enter 发送，Shift+Enter 换行'}
+                      {t('chat.enterHint')}
                     </div>
                   </div>
                 </div>
@@ -986,26 +915,23 @@ Title:`
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
           <div className="bg-card border rounded-[24px] p-6 max-w-md mx-4 shadow-xl">
             <h3 className="text-lg font-semibold mb-2">
-              {isEn ? 'Delete Conversation' : '删除对话'}
+              {t('chat.deleteTitle')}
             </h3>
             <p className="text-muted-foreground mb-6">
-              {isEn 
-                ? 'Are you sure you want to delete this conversation? This action cannot be undone.' 
-                : '确定要删除此对话吗？此操作无法撤销。'
-              }
+              {t('chat.deleteConfirm')}
             </p>
             <div className="flex gap-3 justify-end">
               <Button
                 variant="outline"
                 onClick={() => setConversationToDelete(null)}
               >
-                {isEn ? 'Cancel' : '取消'}
+                {t('common.cancel')}
               </Button>
               <Button
                 variant="destructive"
                 onClick={() => deleteConversation(conversationToDelete)}
               >
-                {isEn ? 'Delete' : '删除'}
+                {t('common.delete')}
               </Button>
             </div>
           </div>

@@ -24,6 +24,38 @@ export function formatDate(date: Date | string | number): string {
   })
 }
 
+export function getSubscriptionColor(type: string, title?: string): string {
+  const text = (title || type).toUpperCase()
+  if (text.includes('PRO+') || text.includes('PRO_PLUS') || text.includes('PROPLUS')) return 'bg-purple-500'
+  if (text.includes('POWER')) return 'bg-amber-500'
+  if (text.includes('PRO')) return 'bg-blue-500'
+  return 'bg-gray-500'
+}
+
+export function formatDateOnly(date: unknown): string {
+  if (!date) return '-'
+  try {
+    if (typeof date === 'string') return date.split('T')[0]
+    if (date instanceof Date) return date.toISOString().split('T')[0]
+    return new Date(date as string | number).toISOString().split('T')[0]
+  } catch {
+    return String(date).split('T')[0]
+  }
+}
+
+export function formatDateTime(date: unknown): string {
+  if (!date) return '-'
+  try {
+    const d = typeof date === 'string' ? new Date(date) : date instanceof Date ? date : new Date(date as number)
+    return d.toLocaleString('zh-CN', {
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit'
+    })
+  } catch {
+    return String(date)
+  }
+}
+
 export function formatPercentage(value: number): string {
   return `${(value * 100).toFixed(1)}%`
 }

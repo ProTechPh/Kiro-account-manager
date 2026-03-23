@@ -103,7 +103,6 @@ export function AddAccountDialog({ isOpen, onClose }: AddAccountDialogProps): Re
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const { t } = useTranslation()
-  const isEn = t('common.unknown') === 'Unknown'
 
   // 登录相关状态
   const [loginType, setLoginType] = useState<LoginType>('builderid')
@@ -203,7 +202,7 @@ export function AddAccountDialog({ isOpen, onClose }: AddAccountDialogProps): Re
         
         // 检查账户是否已存在
         if (isAccountExists(email, userId, providerName)) {
-          setError(isEn ? 'This account already exists' : '该账号已存在，无需重复添加')
+          setError(t('addAccount.alreadyExists'))
           return
         }
         
@@ -304,7 +303,7 @@ export function AddAccountDialog({ isOpen, onClose }: AddAccountDialogProps): Re
   // 启动 IAM SSO 登录 (Authorization Code flow)
   const handleStartIamSsoLogin = async () => {
     if (!ssoStartUrl.trim()) {
-      setError(isEn ? 'Please enter SSO Start URL' : '请输入 SSO Start URL')
+      setError(t('addAccount.enterSsoUrl'))
       return
     }
     
@@ -330,11 +329,11 @@ export function AddAccountDialog({ isOpen, onClose }: AddAccountDialogProps): Re
         // 开始轮询（等待服务器回调自动完成 token 交换）
         startIamSsoPolling(3)
       } else {
-        setError(result.error || (isEn ? 'Failed to start login' : '启动登录失败'))
+        setError(result.error || t('addAccount.startLoginFailed'))
         setIsLoggingIn(false)
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : (isEn ? 'Failed to start login' : '启动登录失败'))
+      setError(e instanceof Error ? e.message : t('addAccount.startLoginFailed'))
       setIsLoggingIn(false)
     }
   }
@@ -350,7 +349,7 @@ export function AddAccountDialog({ isOpen, onClose }: AddAccountDialogProps): Re
         const result = await window.api.pollIamSsoAuth(region)
         
         if (!result.success) {
-          setError(result.error || (isEn ? 'Authorization failed' : '授权失败'))
+        setError(result.error || t('addAccount.authFailed'))
           setIsLoggingIn(false)
           setIamSsoLoginData(null)
           if (pollIntervalRef.current) {
@@ -537,7 +536,7 @@ export function AddAccountDialog({ isOpen, onClose }: AddAccountDialogProps): Re
           
           // 检查账户是否已存在（已存在的也从输入框中移除）
           if (email && userId && isAccountExists(email, userId, 'BuilderId')) {
-            importResult.errors.push(`#${index + 1}: ${email} ${isEn ? 'already exists' : '已存在'}`)
+            importResult.errors.push(`#${index + 1}: ${email} ${t('addAccount.alreadyExistsShort')}`)
             return
           }
           
@@ -705,7 +704,7 @@ export function AddAccountDialog({ isOpen, onClose }: AddAccountDialogProps): Re
           
           if (isAccountExists(email, userId, provider)) {
             // 已存在的不记入失败，也从输入框中移除
-            importResult.errors.push(`#${index + 1}: ${email} ${isEn ? 'already exists' : '已存在'}`)
+            importResult.errors.push(`#${index + 1}: ${email} ${t('addAccount.alreadyExistsShort')}`)
             return
           }
           
@@ -853,7 +852,7 @@ export function AddAccountDialog({ isOpen, onClose }: AddAccountDialogProps): Re
         
         // 检查账户是否已存在
         if (isAccountExists(email, userId, providerName)) {
-          setError(isEn ? 'This account already exists' : '该账号已存在，无需重复添加')
+          setError(t('addAccount.alreadyExists'))
           return
         }
         
@@ -950,12 +949,12 @@ export function AddAccountDialog({ isOpen, onClose }: AddAccountDialogProps): Re
       <Card className="relative w-full max-w-lg max-h-[90vh] overflow-auto z-10">
         <CardHeader className="pb-4 border-b">
           <div className="flex flex-row items-center justify-between">
-            <CardTitle className="text-xl font-bold">{isEn ? 'Add Account' : '添加账号'}</CardTitle>
+            <CardTitle className="text-xl font-bold">{t('addAccount.title')}</CardTitle>
             <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-muted" onClick={onClose}>
               <X className="h-4 w-4" />
             </Button>
           </div>
-          <p className="text-sm text-muted-foreground mt-1">{isEn ? 'Choose a method to add your Kiro account' : '选择一种方式来添加您的 Kiro 账号'}</p>
+          <p className="text-sm text-muted-foreground mt-1">{t('addAccount.chooseMethod')}</p>
         </CardHeader>
 
         <CardContent className="space-y-6 pt-6">
@@ -970,7 +969,7 @@ export function AddAccountDialog({ isOpen, onClose }: AddAccountDialogProps): Re
               onClick={() => { setImportMode('login'); setError(null) }}
               disabled={!!verifiedData || isLoggingIn}
             >
-              {isEn ? 'Login' : '在线登录'}
+              {t('addAccount.loginTab')}
             </button>
             <button
               className={`py-2 px-3 text-sm rounded-lg transition-all duration-200 font-medium ${
@@ -981,7 +980,7 @@ export function AddAccountDialog({ isOpen, onClose }: AddAccountDialogProps): Re
               onClick={() => { setImportMode('oidc'); setError(null) }}
               disabled={!!verifiedData || isLoggingIn}
             >
-              {isEn ? 'OIDC Token' : 'OIDC 凭证'}
+              {t('addAccount.oidcTab')}
             </button>
             <button
               className={`py-2 px-3 text-sm rounded-lg transition-all duration-200 font-medium ${
@@ -1004,7 +1003,7 @@ export function AddAccountDialog({ isOpen, onClose }: AddAccountDialogProps): Re
                 <div className="space-y-4">
                   <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-center">
                     <p className="text-sm text-blue-700 dark:text-blue-300 mb-2">
-                      {isEn ? 'Complete login in browser and enter this code:' : '请在浏览器中完成登录，并输入以下代码：'}
+                      {t('addAccount.completeLoginBrowser')}
                     </p>
                     <div className="flex items-center justify-center gap-2">
                       <code className="text-2xl font-bold tracking-widest bg-white dark:bg-gray-800 px-4 py-2 rounded border">
@@ -1014,14 +1013,14 @@ export function AddAccountDialog({ isOpen, onClose }: AddAccountDialogProps): Re
                         variant="outline" 
                         size="icon"
                         onClick={handleCopyUserCode}
-                        title={isEn ? 'Copy code' : '复制代码'}
+                        title={t('addAccount.copyCode')}
                       >
                         {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
                       </Button>
                     </div>
                     <div className="mt-3 flex items-center justify-center gap-2 text-xs text-muted-foreground">
                       <Loader2 className="h-3 w-3 animate-spin" />
-                      {isEn ? 'Waiting for authorization...' : '等待授权中...'}
+                      {t('addAccount.waitingAuth')}
                     </div>
                   </div>
                   
@@ -1032,14 +1031,14 @@ export function AddAccountDialog({ isOpen, onClose }: AddAccountDialogProps): Re
                       onClick={() => window.api.openExternal(builderIdLoginData.verificationUri, usePrivateMode)}
                     >
                       <ExternalLink className="h-4 w-4 mr-2" />
-                      {isEn ? 'Open Browser' : '重新打开浏览器'}
+                      {t('addAccount.openBrowser')}
                     </Button>
                     <Button 
                       variant="destructive" 
                       className="flex-1"
                       onClick={handleCancelLogin}
                     >
-                      {isEn ? 'Cancel' : '取消登录'}
+                      {t('addAccount.cancelLogin')}
                     </Button>
                   </div>
                 </div>
@@ -1051,10 +1050,10 @@ export function AddAccountDialog({ isOpen, onClose }: AddAccountDialogProps): Re
                   <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-center">
                     <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2 text-blue-500" />
                     <p className="text-sm text-blue-700 dark:text-blue-300">
-                      {isEn ? 'Complete login in browser...' : '请在浏览器中完成登录...'}
+                      {t('addAccount.completeLoginBrowserShort')}
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      {isEn ? 'Will auto return after login' : '登录完成后会自动返回'}
+                      {t('addAccount.autoReturn')}
                     </p>
                   </div>
                   
@@ -1063,7 +1062,7 @@ export function AddAccountDialog({ isOpen, onClose }: AddAccountDialogProps): Re
                     className="w-full"
                     onClick={handleCancelLogin}
                   >
-                    {isEn ? 'Cancel' : '取消登录'}
+                    {t('addAccount.cancelLogin')}
                   </Button>
                 </div>
               )}
@@ -1075,9 +1074,9 @@ export function AddAccountDialog({ isOpen, onClose }: AddAccountDialogProps): Re
                     <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-3">
                       <Check className="w-6 h-6 text-primary" />
                     </div>
-                    <h3 className="text-lg font-semibold">{isEn ? 'Choose Login Method' : '选择登录方式'}</h3>
+                    <h3 className="text-lg font-semibold">{t('addAccount.chooseLoginMethod')}</h3>
                     <p className="text-sm text-muted-foreground mt-1">
-                      {isEn ? 'Multiple quick login options' : '支持多种方式快捷登录'}
+                      {t('addAccount.multipleLoginOptions')}
                     </p>
                   </div>
 
@@ -1099,7 +1098,7 @@ export function AddAccountDialog({ isOpen, onClose }: AddAccountDialogProps): Re
                           <EyeOff className={`w-4 h-4 ${usePrivateMode ? 'text-primary' : 'text-muted-foreground'}`} />
                         </div>
                         <span className={`text-sm font-medium ${usePrivateMode ? 'text-foreground' : 'text-muted-foreground'}`}>
-                          {isEn ? 'Private/Incognito Mode' : '隐私/无痕模式'}
+                          {t('addAccount.privateMode')}
                         </span>
                       </div>
                       <div className={`w-10 h-6 rounded-full p-1 transition-colors ${
@@ -1130,8 +1129,8 @@ export function AddAccountDialog({ isOpen, onClose }: AddAccountDialogProps): Re
                         </svg>
                       </div>
                       <div className="flex flex-col items-start">
-                        <span className="text-sm font-semibold text-foreground">{isEn ? 'Google Account' : 'Google 账号'}</span>
-                        <span className="text-xs text-muted-foreground">{isEn ? 'Quick login with Google' : '使用 Google 账号快捷登录'}</span>
+                        <span className="text-sm font-semibold text-foreground">{t('addAccount.googleAccount')}</span>
+                        <span className="text-xs text-muted-foreground">{t('addAccount.googleLoginDesc')}</span>
                       </div>
                     </button>
 
@@ -1149,8 +1148,8 @@ export function AddAccountDialog({ isOpen, onClose }: AddAccountDialogProps): Re
                         </svg>
                       </div>
                       <div className="flex flex-col items-start">
-                        <span className="text-sm font-semibold text-foreground">{isEn ? 'GitHub Account' : 'GitHub 账号'}</span>
-                        <span className="text-xs text-muted-foreground">{isEn ? 'Quick login with GitHub' : '使用 GitHub 账号快捷登录'}</span>
+                        <span className="text-sm font-semibold text-foreground">{t('addAccount.githubAccount')}</span>
+                        <span className="text-xs text-muted-foreground">{t('addAccount.githubLoginDesc')}</span>
                       </div>
                     </button>
 
@@ -1169,7 +1168,7 @@ export function AddAccountDialog({ isOpen, onClose }: AddAccountDialogProps): Re
                       </div>
                       <div className="flex flex-col items-start">
                         <span className="text-sm font-semibold text-foreground">AWS Builder ID</span>
-                        <span className="text-xs text-muted-foreground">{isEn ? 'Login with AWS Builder ID' : '使用 AWS Builder ID 登录'}</span>
+                        <span className="text-xs text-muted-foreground">{t('addAccount.builderIdDesc')}</span>
                       </div>
                     </button>
 
@@ -1196,7 +1195,7 @@ export function AddAccountDialog({ isOpen, onClose }: AddAccountDialogProps): Re
                   {loginType === 'iamsso' && !iamSsoLoginData && (
                     <div className="space-y-4 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700">
                       <div className="space-y-2">
-                        <Label htmlFor="ssoStartUrl" className="text-sm font-medium">{isEn ? 'SSO Start URL' : 'SSO Start URL'}</Label>
+                        <Label htmlFor="ssoStartUrl" className="text-sm font-medium">SSO Start URL</Label>
                         <Input
                           id="ssoStartUrl"
                           type="url"
@@ -1206,11 +1205,11 @@ export function AddAccountDialog({ isOpen, onClose }: AddAccountDialogProps): Re
                           className="font-mono text-sm"
                         />
                         <p className="text-xs text-muted-foreground">
-                          {isEn ? 'Get this from your organization admin' : '从您的组织管理员处获取'}
+                          {t('addAccount.ssoOrgHint')}
                         </p>
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="ssoRegion" className="text-sm font-medium">{isEn ? 'SSO Region' : 'SSO 区域'}</Label>
+                        <Label htmlFor="ssoRegion" className="text-sm font-medium">{t('addAccount.ssoRegion')}</Label>
                         <div className="flex gap-2">
                           <select
                             id="ssoRegion"
@@ -1249,15 +1248,15 @@ export function AddAccountDialog({ isOpen, onClose }: AddAccountDialogProps): Re
                               <option value="me-south-1">me-south-1 (Bahrain)</option>
                               <option value="af-south-1">af-south-1 (Cape Town)</option>
                             </optgroup>
-                            <optgroup label={isEn ? 'Custom' : '自定义'}>
-                              <option value="custom">{isEn ? '-- Custom Input --' : '-- 自定义输入 --'}</option>
+                            <optgroup label={t('addAccount.custom')}>
+                              <option value="custom">{t('addAccount.customInput')}</option>
                             </optgroup>
                           </select>
                           <input
                             type="text"
                             value={region}
                             onChange={(e) => setRegion(e.target.value)}
-                            placeholder={isEn ? 'e.g., cn-north-1' : '例如: cn-north-1'}
+                            placeholder={t('addAccount.regionPlaceholder')}
                             className="w-32 h-10 px-3 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm"
                           />
                         </div>
@@ -1267,7 +1266,7 @@ export function AddAccountDialog({ isOpen, onClose }: AddAccountDialogProps): Re
                         onClick={handleStartIamSsoLogin}
                         disabled={!ssoStartUrl.trim() || isLoggingIn}
                       >
-                        {isLoggingIn ? (isEn ? 'Starting...' : '启动中...') : (isEn ? 'Start Login' : '开始登录')}
+                        {isLoggingIn ? t('addAccount.starting') : t('addAccount.startLogin')}
                       </Button>
                     </div>
                   )}
@@ -1276,7 +1275,7 @@ export function AddAccountDialog({ isOpen, onClose }: AddAccountDialogProps): Re
                   {loginType === 'iamsso' && iamSsoLoginData && (
                     <div className="space-y-4 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700">
                       <div className="text-center space-y-2">
-                        <p className="text-sm font-medium">{isEn ? 'Enter this code in browser:' : '在浏览器中输入此代码:'}</p>
+                        <p className="text-sm font-medium">{t('addAccount.enterCodeBrowser')}</p>
                         <div className="flex items-center justify-center gap-2">
                           <code className="px-4 py-2 bg-primary/10 text-primary font-mono text-2xl font-bold rounded-lg">
                             {iamSsoLoginData.userCode}
@@ -1296,14 +1295,14 @@ export function AddAccountDialog({ isOpen, onClose }: AddAccountDialogProps): Re
                       </div>
                       <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
                         <Loader2 className="w-4 h-4 animate-spin" />
-                        <span>{isEn ? 'Waiting for authorization...' : '等待授权中...'}</span>
+                        <span>{t('addAccount.waitingAuth')}</span>
                       </div>
                       <Button 
                         variant="destructive" 
                         className="w-full"
                         onClick={handleCancelLogin}
                       >
-                        {isEn ? 'Cancel' : '取消登录'}
+                        {t('addAccount.cancelLogin')}
                       </Button>
                     </div>
                   )}
@@ -1321,11 +1320,11 @@ export function AddAccountDialog({ isOpen, onClose }: AddAccountDialogProps): Re
                       <Info className="w-4 h-4" />
                    </div>
                    <div className="flex-1">
-                      <p className="text-sm font-semibold text-blue-700 dark:text-blue-300 mb-1.5">{isEn ? 'How to get Token?' : '如何获取 Token?'}</p>
+                      <p className="text-sm font-semibold text-blue-700 dark:text-blue-300 mb-1.5">{t('addAccount.howToGetToken')}</p>
                       <ol className="text-xs text-blue-600/90 dark:text-blue-400/90 list-decimal list-inside space-y-1.5">
-                        <li>{isEn ? 'Visit and login:' : '在浏览器中访问并登录:'} <a href="https://view.awsapps.com/start/#/device?user_code=PQCF-FCCN/start/#/device?user_code=PQCF-FCCN" target="_blank" className="underline hover:text-blue-800 font-medium">view.awsapps.com/start/#/device?user_code=PQCF-FCCN</a></li>
-                        <li>{isEn ? 'Press F12 → Application → Cookies' : '按 F12 打开开发者工具 → Application → Cookies'}</li>
-                        <li>{isEn ? 'Find and copy' : '找到并复制'} <code className="px-1 py-0.5 bg-blue-100 dark:bg-blue-900/40 rounded font-mono text-[10px]">x-amz-sso_authn</code> {isEn ? 'value' : '的值'}</li>
+                        <li>{t('addAccount.ssoStep1')} <a href="https://view.awsapps.com/start/#/device?user_code=PQCF-FCCN/start/#/device?user_code=PQCF-FCCN" target="_blank" className="underline hover:text-blue-800 font-medium">view.awsapps.com/start/#/device?user_code=PQCF-FCCN</a></li>
+                        <li>{t('addAccount.ssoStep2')}</li>
+                        <li>{t('addAccount.ssoStep3')} <code className="px-1 py-0.5 bg-blue-100 dark:bg-blue-900/40 rounded font-mono text-[10px]">x-amz-sso_authn</code> {t('addAccount.ssoStep3Value')}</li>
                       </ol>
                    </div>
                 </div>
@@ -1335,17 +1334,17 @@ export function AddAccountDialog({ isOpen, onClose }: AddAccountDialogProps): Re
                 <div className="space-y-2">
                   <label className="text-sm font-medium flex items-center gap-1">
                     x-amz-sso_authn <span className="text-destructive">*</span>
-                    <span className="text-xs text-muted-foreground font-normal ml-2">{isEn ? 'Supports batch import, one per line' : '支持批量导入，每行一个 Token'}</span>
+                    <span className="text-xs text-muted-foreground font-normal ml-2">{t('addAccount.batchImportHint')}</span>
                   </label>
                   <textarea
                     className="w-full min-h-[120px] px-3 py-2.5 text-sm rounded-xl border border-input bg-background/50 ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none font-mono"
-                    placeholder={isEn ? 'Paste Token content, one per line&#10;eyJlbmMiOiJBMjU2...&#10;eyJlbmMiOiJBMjU2...' : '粘贴 Token 内容，每行一个&#10;eyJlbmMiOiJBMjU2...&#10;eyJlbmMiOiJBMjU2...'}
+                    placeholder={t('addAccount.ssoTokenPlaceholder')}
                     value={ssoToken}
                     onChange={(e) => { setSsoToken(e.target.value); setBatchImportResult(null) }}
                   />
                   {ssoToken.trim() && (
                     <p className="text-xs text-muted-foreground">
-                      {isEn ? `Entered ${ssoToken.split('\n').filter(t => t.trim()).length} tokens` : `已输入 ${ssoToken.split('\n').filter(t => t.trim()).length} 个 Token`}
+                      {t('addAccount.enteredTokens', { n: ssoToken.split('\n').filter(t => t.trim()).length })}
                     </p>
                   )}
                 </div>
@@ -1389,15 +1388,15 @@ export function AddAccountDialog({ isOpen, onClose }: AddAccountDialogProps): Re
                         <option value="me-south-1">me-south-1 (Bahrain)</option>
                         <option value="af-south-1">af-south-1 (Cape Town)</option>
                       </optgroup>
-                      <optgroup label={isEn ? 'Custom' : '自定义'}>
-                        <option value="custom">{isEn ? '-- Custom --' : '-- 自定义 --'}</option>
+                      <optgroup label={t('addAccount.custom')}>
+                        <option value="custom">{t('addAccount.customOption')}</option>
                       </optgroup>
                     </select>
                     <input
                       type="text"
                       value={region}
                       onChange={(e) => setRegion(e.target.value)}
-                      placeholder={isEn ? 'e.g., cn-north-1' : '例如: cn-north-1'}
+                      placeholder={t('addAccount.regionPlaceholder')}
                       className="w-28 h-10 px-2 text-sm rounded-xl border border-input bg-background/50"
                     />
                   </div>
@@ -1408,7 +1407,7 @@ export function AddAccountDialog({ isOpen, onClose }: AddAccountDialogProps): Re
               {batchImportResult && (
                 <div className={`p-3 rounded-lg text-sm ${batchImportResult.failed > 0 ? 'bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800' : 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800'}`}>
                   <p className={`font-medium ${batchImportResult.failed > 0 ? 'text-amber-700 dark:text-amber-300' : 'text-green-700 dark:text-green-300'}`}>
-                    {isEn ? `Result: ${batchImportResult.success}/${batchImportResult.total} succeeded` : `导入结果: 成功 ${batchImportResult.success}/${batchImportResult.total}`}
+                    {t('addAccount.importResult', { success: batchImportResult.success, total: batchImportResult.total })}
                   </p>
                   {batchImportResult.errors.length > 0 && (
                     <ul className="mt-2 text-xs text-amber-600 dark:text-amber-400 space-y-0.5 max-h-20 overflow-y-auto">
@@ -1429,12 +1428,12 @@ export function AddAccountDialog({ isOpen, onClose }: AddAccountDialogProps): Re
                 {isVerifying ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    {isEn ? `Importing ${ssoToken.split('\n').filter(t => t.trim()).length} accounts...` : `正在并发导入 ${ssoToken.split('\n').filter(t => t.trim()).length} 个账号...`}
+                    {t('addAccount.importing', { n: ssoToken.split('\n').filter(t => t.trim()).length })}
                   </>
                 ) : (
                   ssoToken.split('\n').filter(t => t.trim()).length > 1 
-                    ? (isEn ? `Batch import ${ssoToken.split('\n').filter(t => t.trim()).length} accounts` : `批量导入 ${ssoToken.split('\n').filter(t => t.trim()).length} 个账号`)
-                    : (isEn ? 'Import & Verify' : '导入并验证')
+                    ? t('addAccount.batchImportN', { n: ssoToken.split('\n').filter(t => t.trim()).length })
+                    : t('addAccount.importVerify')
                 )}
               </Button>
             </div>
@@ -1444,7 +1443,7 @@ export function AddAccountDialog({ isOpen, onClose }: AddAccountDialogProps): Re
           {importMode === 'oidc' && !verifiedData && (
             <div className="space-y-5">
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold">{isEn ? 'Enter OIDC Token' : '输入 OIDC 凭证'}</h3>
+                <h3 className="text-sm font-semibold">{t('addAccount.enterOidcToken')}</h3>
                 <div className="flex items-center gap-2">
                   {/* 单个/批量 切换 */}
                   <div className="flex bg-muted/50 rounded-lg p-0.5">
@@ -1452,13 +1451,13 @@ export function AddAccountDialog({ isOpen, onClose }: AddAccountDialogProps): Re
                       className={`px-2.5 py-1 text-xs rounded-md transition-all ${oidcImportMode === 'single' ? 'bg-background shadow-sm font-medium' : 'text-muted-foreground hover:text-foreground'}`}
                       onClick={() => { setOidcImportMode('single'); setOidcBatchImportResult(null) }}
                     >
-                      {isEn ? 'Single' : '单个'}
+                      {t('addAccount.single')}
                     </button>
                     <button
                       className={`px-2.5 py-1 text-xs rounded-md transition-all ${oidcImportMode === 'batch' ? 'bg-background shadow-sm font-medium' : 'text-muted-foreground hover:text-foreground'}`}
                       onClick={() => { setOidcImportMode('batch'); setOidcBatchImportResult(null) }}
                     >
-                      {isEn ? 'Batch' : '批量'}
+                      {t('addAccount.batch')}
                     </button>
                   </div>
                   {oidcImportMode === 'single' && (
@@ -1470,7 +1469,7 @@ export function AddAccountDialog({ isOpen, onClose }: AddAccountDialogProps): Re
                       onClick={handleImportFromLocal}
                     >
                       <Download className="h-3 w-3 mr-1" />
-                      {isEn ? 'Import' : '本地导入'}
+                      {t('addAccount.localImport')}
                     </Button>
                   )}
                 </div>
@@ -1482,7 +1481,7 @@ export function AddAccountDialog({ isOpen, onClose }: AddAccountDialogProps): Re
                   <div className="space-y-4">
                     {/* 登录类型选择 */}
                     <div className="space-y-2">
-                      <label className="text-sm font-medium">{isEn ? 'Login Type' : '登录类型'}</label>
+                      <label className="text-sm font-medium">{t('addAccount.loginType')}</label>
                       <div className="flex gap-2">
                         <button
                           type="button"
@@ -1534,7 +1533,7 @@ export function AddAccountDialog({ isOpen, onClose }: AddAccountDialogProps): Re
                             </button>
                           </div>
                           <p className="text-xs text-muted-foreground">
-                            {isEn ? 'Social login does not require Client ID and Secret' : '社交登录不需要 Client ID 和 Client Secret'}
+                            {t('addAccount.socialLoginHint')}
                           </p>
                         </div>
                       )}
@@ -1551,7 +1550,7 @@ export function AddAccountDialog({ isOpen, onClose }: AddAccountDialogProps): Re
                       </label>
                       <textarea
                         className="w-full min-h-[80px] px-3 py-2.5 text-sm rounded-xl border border-input bg-background/50 ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none font-mono"
-                        placeholder={isEn ? 'Paste Refresh Token...' : '粘贴 Refresh Token...'}
+                        placeholder={t('addAccount.refreshTokenPlaceholder')}
                         value={refreshToken}
                         onChange={(e) => setRefreshToken(e.target.value)}
                       />
@@ -1627,15 +1626,15 @@ export function AddAccountDialog({ isOpen, onClose }: AddAccountDialogProps): Re
                                 <option value="me-south-1">me-south-1 (Bahrain)</option>
                                 <option value="af-south-1">af-south-1 (Cape Town)</option>
                               </optgroup>
-                              <optgroup label={isEn ? 'Custom' : '自定义'}>
-                                <option value="custom">{isEn ? '-- Custom --' : '-- 自定义 --'}</option>
+                              <optgroup label={t('addAccount.custom')}>
+                                <option value="custom">{t('addAccount.customOption')}</option>
                               </optgroup>
                             </select>
                             <input
                               type="text"
                               value={region}
                               onChange={(e) => setRegion(e.target.value)}
-                              placeholder={isEn ? 'e.g., cn-north-1' : '例如: cn-north-1'}
+                              placeholder={t('addAccount.regionPlaceholder')}
                               className="w-28 h-10 px-2 text-sm rounded-xl border border-input bg-background/50"
                             />
                           </div>
@@ -1651,8 +1650,8 @@ export function AddAccountDialog({ isOpen, onClose }: AddAccountDialogProps): Re
                 <>
                   <div className="p-3 bg-blue-50/50 dark:bg-blue-900/10 rounded-xl border border-blue-100 dark:border-blue-900/20">
                     <p className="text-xs text-blue-600 dark:text-blue-400">
-                      {isEn ? 'JSON array format. Required:' : '支持 JSON 数组格式。必填:'} <code className="px-1 bg-blue-100 dark:bg-blue-900/40 rounded">refreshToken</code>.
-                      {isEn ? 'Optional:' : '可选:'} <code className="px-1 bg-blue-100 dark:bg-blue-900/40 rounded">provider</code> (BuilderId/Enterprise/Github/Google),
+                      {t('addAccount.jsonRequired')} <code className="px-1 bg-blue-100 dark:bg-blue-900/40 rounded">refreshToken</code>.
+                      {t('addAccount.jsonOptional')} <code className="px-1 bg-blue-100 dark:bg-blue-900/40 rounded">provider</code> (BuilderId/Enterprise/Github/Google),
                       <code className="px-1 bg-blue-100 dark:bg-blue-900/40 rounded">clientId</code>,
                       <code className="px-1 bg-blue-100 dark:bg-blue-900/40 rounded">clientSecret</code>
                     </p>
@@ -1660,7 +1659,7 @@ export function AddAccountDialog({ isOpen, onClose }: AddAccountDialogProps): Re
 
                   <div className="space-y-2">
                     <label className="text-sm font-medium flex items-center gap-2">
-                      {isEn ? 'JSON Credentials' : 'JSON 凭证数据'} <span className="text-destructive">*</span>
+                      {t('addAccount.jsonCredentials')} <span className="text-destructive">*</span>
                     </label>
                     <textarea
                       className="w-full min-h-[180px] px-3 py-2.5 text-sm rounded-xl border border-input bg-background/50 ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none font-mono text-xs"
@@ -1693,9 +1692,9 @@ export function AddAccountDialog({ isOpen, onClose }: AddAccountDialogProps): Re
                       try {
                         const parsed = JSON.parse(oidcBatchData.trim())
                         const count = Array.isArray(parsed) ? parsed.length : 1
-                        return <p className="text-xs text-muted-foreground">{isEn ? `Entered ${count} credentials` : `已输入 ${count} 个凭证`}</p>
+                        return <p className="text-xs text-muted-foreground">{t('addAccount.enteredCredentials', { n: count })}</p>
                       } catch {
-                        return <p className="text-xs text-destructive">{isEn ? 'Invalid JSON format' : 'JSON 格式错误'}</p>
+                        return <p className="text-xs text-destructive">{t('addAccount.invalidJson')}</p>
                       }
                     })()}
                   </div>
@@ -1704,7 +1703,7 @@ export function AddAccountDialog({ isOpen, onClose }: AddAccountDialogProps): Re
                   {oidcBatchImportResult && (
                     <div className={`p-3 rounded-lg text-sm ${oidcBatchImportResult.failed > 0 ? 'bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800' : 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800'}`}>
                       <p className={`font-medium ${oidcBatchImportResult.failed > 0 ? 'text-amber-700 dark:text-amber-300' : 'text-green-700 dark:text-green-300'}`}>
-                        {isEn ? `Result: ${oidcBatchImportResult.success}/${oidcBatchImportResult.total} succeeded` : `导入结果: 成功 ${oidcBatchImportResult.success}/${oidcBatchImportResult.total}`}
+                        {t('addAccount.importResult', { success: oidcBatchImportResult.success, total: oidcBatchImportResult.total })}
                       </p>
                       {oidcBatchImportResult.errors.length > 0 && (
                         <ul className="mt-2 text-xs text-amber-600 dark:text-amber-400 space-y-0.5 max-h-20 overflow-y-auto">
@@ -1732,7 +1731,7 @@ export function AddAccountDialog({ isOpen, onClose }: AddAccountDialogProps): Re
           {importMode === 'oidc' && (
             <div className="flex justify-end gap-3 pt-4 border-t">
               <Button type="button" variant="outline" onClick={onClose} className="rounded-xl h-10 px-6">
-                {isEn ? 'Cancel' : '取消'}
+                {t('common.cancel')}
               </Button>
               {oidcImportMode === 'single' ? (
                 <Button 
@@ -1741,7 +1740,7 @@ export function AddAccountDialog({ isOpen, onClose }: AddAccountDialogProps): Re
                   className="rounded-xl h-10 px-6"
                 >
                   {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                  {isEn ? 'Add Account' : '确认添加'}
+                  {t('addAccount.confirmAdd')}
                 </Button>
               ) : (
                 <Button 
@@ -1752,16 +1751,16 @@ export function AddAccountDialog({ isOpen, onClose }: AddAccountDialogProps): Re
                   {isSubmitting ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      {isEn ? 'Importing...' : '正在并发导入...'}
+                      {t('addAccount.importing2')}
                     </>
                   ) : (
                     (() => {
                       try {
                         const parsed = JSON.parse(oidcBatchData.trim())
                         const count = Array.isArray(parsed) ? parsed.length : 1
-                        return isEn ? `Batch import ${count} accounts` : `批量导入 ${count} 个账号`
+                        return t('addAccount.batchImportN', { n: count })
                       } catch {
-                        return isEn ? 'Batch Import' : '批量导入'
+                        return t('addAccount.batchImport')
                       }
                     })()
                   )}

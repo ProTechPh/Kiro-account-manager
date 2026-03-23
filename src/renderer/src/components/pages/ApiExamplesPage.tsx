@@ -6,7 +6,6 @@ import { useTranslation } from '@/hooks/useTranslation'
 
 export function ApiExamplesPage() {
   const { t } = useTranslation()
-  const isEn = t('common.unknown') === 'Unknown'
   const [activeTab, setActiveTab] = useState<'curl' | 'python' | 'javascript'>('curl')
   const [activeApi, setActiveApi] = useState<'openai' | 'anthropic'>('openai')
   const [copied, setCopied] = useState(false)
@@ -249,8 +248,8 @@ console.log(message.content);`
             <Code className="h-6 w-6 text-primary-foreground" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-primary">{isEn ? 'API Examples' : 'API 示例'}</h1>
-            <p className="text-muted-foreground">{isEn ? 'Code examples for integrating with the proxy server.' : '代理服务器集成代码示例'}</p>
+            <h1 className="text-2xl font-bold text-primary">{t('apiExamples.title')}</h1>
+            <p className="text-muted-foreground">{t('apiExamples.description')}</p>
           </div>
         </div>
       </div>
@@ -258,7 +257,7 @@ console.log(message.content);`
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* API Examples Card */}
         <Card className="border-0 shadow-sm hover:shadow-md transition-shadow duration-200 rounded-[32px] p-6">
-          <h2 className="text-lg font-semibold mb-4">{isEn ? 'API Examples' : 'API 示例'}</h2>
+          <h2 className="text-lg font-semibold mb-4">{t('apiExamples.title')}</h2>
 
           {/* API Type Tabs */}
           <div className="flex gap-2 mb-4">
@@ -325,12 +324,12 @@ console.log(message.content);`
               {copied ? (
                 <>
                   <Check className="h-4 w-4 mr-2" />
-                  {isEn ? 'Copied' : '已复制'}
+                  {t('apiExamples.copied')}
                 </>
               ) : (
                 <>
                   <Copy className="h-4 w-4 mr-2" />
-                  {isEn ? 'Copy' : '复制'}
+                  {t('apiExamples.copy')}
                 </>
               )}
             </Button>
@@ -346,7 +345,7 @@ console.log(message.content);`
 
         {/* Import to CC Switch Card */}
         <Card className="border-0 shadow-sm hover:shadow-md transition-shadow duration-200 rounded-[32px] p-6">
-          <h2 className="text-lg font-semibold mb-4">{isEn ? 'Import to CC Switch' : '导入到 CC Switch'}</h2>
+          <h2 className="text-lg font-semibold mb-4">{t('apiExamples.importCCSwitch')}</h2>
 
           <div className="space-y-4">
             <div className="flex items-start gap-3 p-4 bg-muted/50 rounded-xl">
@@ -367,33 +366,27 @@ console.log(message.content);`
                   </a>
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  {isEn 
-                    ? 'CC Switch is a Claude Code configuration manager that allows quick switching between different API Providers.'
-                    : 'CC Switch 是一个 Claude Code 配置管理器，允许快速切换不同的 API 提供商。'
-                  }
+                  {t('apiExamples.ccSwitchDesc')}
                 </p>
               </div>
             </div>
 
             <div className="p-4 bg-muted/30 rounded-xl space-y-3">
               <p className="text-sm text-muted-foreground">
-                {isEn
-                  ? 'One-click import this configuration to CC Switch, enabling Claude Code to use the Kiro gateway.'
-                  : '一键导入此配置到 CC Switch，使 Claude Code 能够使用 Kiro 网关。'
-                }
+                {t('apiExamples.ccSwitchImportDesc')}
               </p>
 
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">{isEn ? 'Provider:' : '提供商：'}</span>
+                  <span className="text-sm text-muted-foreground">{t('apiExamples.provider')}</span>
                   <span className="text-sm font-medium">Kiro</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">{isEn ? 'Endpoint:' : '端点：'}</span>
+                  <span className="text-sm text-muted-foreground">{t('apiExamples.endpoint')}</span>
                   <span className="text-sm font-mono">{endpoint}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">{isEn ? 'API Key:' : 'API 密钥：'}</span>
+                  <span className="text-sm text-muted-foreground">{t('apiExamples.apiKey')}</span>
                   <div className="flex items-center gap-2">
                     {hasApiKey ? (
                       <>
@@ -401,7 +394,7 @@ console.log(message.content);`
                         <button
                           onClick={() => setShowApiKey(!showApiKey)}
                           className="p-1 hover:bg-muted rounded transition-colors"
-                          title={showApiKey ? (isEn ? 'Hide API Key' : '隐藏 API 密钥') : (isEn ? 'Show API Key' : '显示 API 密钥')}
+                          title={showApiKey ? t('apiExamples.hideApiKey') : t('apiExamples.showApiKey')}
                         >
                           {showApiKey ? (
                             <EyeOff className="h-3 w-3" />
@@ -412,7 +405,7 @@ console.log(message.content);`
                       </>
                     ) : (
                       <span className="text-sm text-muted-foreground italic">
-                        {isEn ? 'Not configured' : '未配置'}
+                        {t('apiExamples.notConfigured')}
                       </span>
                     )}
                   </div>
@@ -426,46 +419,17 @@ console.log(message.content);`
               className="w-full gap-2 rounded-xl"
             >
               <ExternalLink className="h-4 w-4" />
-              {isEn ? 'Import to CC Switch' : '导入到 CC Switch'}
+              {t('apiExamples.importButton')}
             </Button>
 
             {!hasApiKey && (
               <p className="text-xs text-amber-600 mt-2 text-center">
-                {isEn ? 'Please configure API Key in Proxy settings first' : '请先在代理设置中配置 API 密钥'}
+                {t('apiExamples.configureApiKey')}
               </p>
             )}
 
             <p className="text-xs text-muted-foreground text-center mt-2">
-              {isEn
-                ? (
-                  <>
-                    Make sure{' '}
-                    <a
-                      href="https://github.com/farion1231/cc-switch"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-primary hover:underline"
-                    >
-                      CC Switch
-                    </a>
-                    {' '}is installed before importing.
-                  </>
-                )
-                : (
-                  <>
-                    导入前请确保已安装{' '}
-                    <a
-                      href="https://github.com/farion1231/cc-switch"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-primary hover:underline"
-                    >
-                      CC Switch
-                    </a>
-                    。
-                  </>
-                )
-              }
+              {t('apiExamples.ccSwitchInstallHint')}
             </p>
           </div>
         </Card>

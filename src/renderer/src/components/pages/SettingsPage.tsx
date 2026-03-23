@@ -39,7 +39,6 @@ export function SettingsPage() {
   } = useAccountsStore()
 
   const { t } = useTranslation()
-  const isEn = t('common.unknown') === 'Unknown'
   const [showExportDialog, setShowExportDialog] = useState(false)
   const [isImporting, setIsImporting] = useState(false)
   const [tempProxyUrl, setTempProxyUrl] = useState(proxyUrl)
@@ -188,25 +187,24 @@ export function SettingsPage() {
       if (fileData && fileData.format === 'json') {
         const data = JSON.parse(fileData.content)
         const importResult = importFromExportData(data)
-        alert(`导入完成：成功 ${importResult.success} 个，失败 ${importResult.failed} 个`)
+        alert(t('settings.data.importResult', { success: importResult.success, failed: importResult.failed }))
       } else if (fileData) {
-        alert('设置页面仅支持 JSON 格式导入，请使用账号管理页面导入 CSV/TXT')
+        alert(t('settings.data.importJsonOnly'))
       }
     } catch (e) {
-      alert(`导入失败: ${e instanceof Error ? e.message : '未知错误'}`)
+      alert(t('settings.data.importFailed', { error: e instanceof Error ? e.message : String(e) }))
     } finally {
       setIsImporting(false)
     }
   }
 
   const handleClearData = () => {
-    if (confirm('确定要清除所有账号数据吗？此操作不可恢复！')) {
-      if (confirm('再次确认：这将删除所有账号、分组和标签数据！')) {
-        // 清除所有数据
+    if (confirm(t('settings.dangerZone.clearDataConfirm'))) {
+      if (confirm(t('settings.dangerZone.clearDataConfirm2'))) {
         Array.from(accounts.keys()).forEach(id => {
           useAccountsStore.getState().removeAccount(id)
         })
-        alert('所有数据已清除')
+        alert(t('settings.dangerZone.clearDataDone'))
       }
     }
   }
@@ -223,7 +221,7 @@ export function SettingsPage() {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-primary">{t('settings.title')}</h1>
-            <p className="text-muted-foreground">{t('settings.title') === 'Settings' ? 'Configure app features' : '配置应用的各项功能'}</p>
+            <p className="text-muted-foreground">{t('settings.description')}</p>
           </div>
         </div>
       </div>
@@ -255,9 +253,8 @@ export function SettingsPage() {
             </select>
           </div>
           <div className="text-xs text-muted-foreground bg-muted/50 rounded-lg p-3 space-y-1">
-            <p>• 自动模式会根据系统语言自动选择</p>
-            <p>• Auto mode will follow system language</p>
-            <p>• 支持自定义翻译文件扩展（开发中）</p>
+            <p>• {t('settings.language.autoHint')}</p>
+            <p>• {t('settings.language.customHint2')}</p>
           </div>
         </CardContent>
       </Card>
@@ -269,15 +266,15 @@ export function SettingsPage() {
             <div className="p-2 rounded-lg bg-primary/10">
               <Palette className="h-4 w-4 text-primary" />
             </div>
-            {isEn ? 'Theme' : '主题设置'}
+            {t('settings.theme.title')}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* 深色模式 */}
           <div className="flex items-center justify-between">
             <div>
-              <p className="font-medium">{isEn ? 'Dark Mode' : '深色模式'}</p>
-              <p className="text-sm text-muted-foreground">{isEn ? 'Toggle dark/light theme' : '切换深色/浅色主题'}</p>
+              <p className="font-medium">{t('settings.theme.darkMode')}</p>
+              <p className="text-sm text-muted-foreground">{t('settings.theme.darkModeDesc')}</p>
             </div>
             <Button
               variant={darkMode ? "default" : "outline"}
@@ -285,7 +282,7 @@ export function SettingsPage() {
               onClick={() => setDarkMode(!darkMode)}
             >
               {darkMode ? <Moon className="h-4 w-4 mr-2" /> : <Sun className="h-4 w-4 mr-2" />}
-              {darkMode ? (isEn ? 'Dark' : '深色') : (isEn ? 'Light' : '浅色')}
+              {darkMode ? t('settings.theme.dark') : t('settings.theme.light')}
             </Button>
           </div>
         </CardContent>
@@ -298,14 +295,14 @@ export function SettingsPage() {
             <div className="p-2 rounded-lg bg-primary/10">
               {privacyMode ? <EyeOff className="h-4 w-4 text-primary" /> : <Eye className="h-4 w-4 text-primary" />}
             </div>
-            {isEn ? 'Privacy' : '隐私设置'}
+            {t('settings.privacy.title')}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="font-medium">{isEn ? 'Privacy Mode' : '隐私模式'}</p>
-              <p className="text-sm text-muted-foreground">{isEn ? 'Hide emails and sensitive info' : '隐藏邮箱和账号敏感信息'}</p>
+              <p className="font-medium">{t('settings.privacy.privacyMode')}</p>
+              <p className="text-sm text-muted-foreground">{t('settings.privacy.privacyModeDesc')}</p>
             </div>
             <Button
               variant={privacyMode ? "default" : "outline"}
@@ -313,26 +310,26 @@ export function SettingsPage() {
               onClick={() => setPrivacyMode(!privacyMode)}
             >
               {privacyMode ? <EyeOff className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
-              {privacyMode ? (isEn ? 'On' : '已开启') : (isEn ? 'Off' : '已关闭')}
+              {privacyMode ? t('common.on') : t('common.off')}
             </Button>
           </div>
           <div className="flex items-center justify-between pt-2 border-t">
             <div>
-              <p className="font-medium">{isEn ? 'Usage Precision' : '使用量精度'}</p>
-              <p className="text-sm text-muted-foreground">{isEn ? 'Show decimal places for usage values' : '显示使用量的小数精度（如 1.22 而非 1）'}</p>
+              <p className="font-medium">{t('settings.privacy.usagePrecision')}</p>
+              <p className="text-sm text-muted-foreground">{t('settings.privacy.usagePrecisionDesc')}</p>
             </div>
             <Button
               variant={usagePrecision ? "default" : "outline"}
               size="sm"
               onClick={() => setUsagePrecision(!usagePrecision)}
             >
-              {usagePrecision ? (isEn ? 'Decimal' : '小数') : (isEn ? 'Integer' : '整数')}
+              {usagePrecision ? t('settings.privacy.decimal') : t('settings.privacy.integer')}
             </Button>
           </div>
           <div className="flex items-center justify-between pt-2 border-t">
             <div>
-              <p className="font-medium">{isEn ? 'Login Private Mode' : '登录隐私模式'}</p>
-              <p className="text-sm text-muted-foreground">{isEn ? 'Open browser in incognito/private mode when logging in' : '在线登录时使用浏览器无痕/隐私模式打开'}</p>
+              <p className="font-medium">{t('settings.privacy.loginPrivateMode')}</p>
+              <p className="text-sm text-muted-foreground">{t('settings.privacy.loginPrivateModeDesc')}</p>
             </div>
             <Button
               variant={loginPrivateMode ? "default" : "outline"}
@@ -340,7 +337,7 @@ export function SettingsPage() {
               onClick={() => setLoginPrivateMode(!loginPrivateMode)}
             >
               <UserX className="h-4 w-4 mr-2" />
-              {loginPrivateMode ? (isEn ? 'On' : '已开启') : (isEn ? 'Off' : '已关闭')}
+              {loginPrivateMode ? t('common.on') : t('common.off')}
             </Button>
           </div>
         </CardContent>
@@ -353,56 +350,50 @@ export function SettingsPage() {
             <div className="p-2 rounded-lg bg-primary/10">
               <RefreshCw className="h-4 w-4 text-primary" />
             </div>
-            {isEn ? 'Auto Refresh' : '自动刷新'}
+            {t('settings.autoRefresh.title')}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="font-medium">{isEn ? 'Auto Refresh' : '自动刷新'}</p>
-              <p className="text-sm text-muted-foreground">{isEn ? 'Auto refresh tokens before expiration' : 'Token 过期前自动刷新，并同步更新账户信息'}</p>
+              <p className="font-medium">{t('settings.autoRefresh.enabled')}</p>
+              <p className="text-sm text-muted-foreground">{t('settings.autoRefresh.enabledDesc')}</p>
             </div>
             <Button
               variant={autoRefreshEnabled ? "default" : "outline"}
               size="sm"
               onClick={() => setAutoRefresh(!autoRefreshEnabled)}
             >
-              {autoRefreshEnabled ? (isEn ? 'On' : '已开启') : (isEn ? 'Off' : '已关闭')}
+              {autoRefreshEnabled ? t('common.on') : t('common.off')}
             </Button>
           </div>
 
           {autoRefreshEnabled && (
             <>
               <div className="text-xs text-muted-foreground bg-muted/50 rounded-lg p-3 space-y-1">
-                <p>• {isEn ? 'Auto refresh tokens to keep login' : 'Token 即将过期时自动刷新，保持登录状态'}</p>
-                <p>• {isEn ? 'Update usage and subscription info after refresh' : 'Token 刷新后自动更新账户用量、订阅等信息'}</p>
-                <p>• {isEn ? 'Check all balances when auto-switch is on' : '开启自动换号时，会定期检查所有账户余额'}</p>
+                <p>• {t('settings.autoRefresh.hint1')}</p>
+                <p>• {t('settings.autoRefresh.hint2')}</p>
+                <p>• {t('settings.autoRefresh.hint3')}</p>
               </div>
               <div className="flex items-center justify-between pt-2 border-t">
                 <div>
-                  <p className="font-medium">{isEn ? 'Check Interval' : '检查间隔'}</p>
-                  <p className="text-sm text-muted-foreground">{isEn ? 'How often to check account status' : '每隔多久检查一次账户状态'}</p>
+                  <p className="font-medium">{t('settings.autoRefresh.interval')}</p>
+                  <p className="text-sm text-muted-foreground">{t('settings.autoRefresh.intervalDesc')}</p>
                 </div>
                 <select
                   className="w-[120px] h-9 px-3 rounded-lg border bg-background text-sm focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
                   value={autoRefreshInterval}
                   onChange={(e) => setAutoRefresh(true, parseInt(e.target.value))}
                 >
-                  <option value="1">{isEn ? '1 min' : '1 分钟'}</option>
-                  <option value="3">{isEn ? '3 min' : '3 分钟'}</option>
-                  <option value="5">{isEn ? '5 min' : '5 分钟'}</option>
-                  <option value="10">{isEn ? '10 min' : '10 分钟'}</option>
-                  <option value="15">{isEn ? '15 min' : '15 分钟'}</option>
-                  <option value="20">{isEn ? '20 min' : '20 分钟'}</option>
-                  <option value="30">{isEn ? '30 min' : '30 分钟'}</option>
-                  <option value="45">{isEn ? '45 min' : '45 分钟'}</option>
-                  <option value="60">{isEn ? '60 min' : '60 分钟'}</option>
+                  {[1, 3, 5, 10, 15, 20, 30, 45, 60].map(n => (
+                    <option key={n} value={n}>{t('settings.autoRefresh.minutes', { n })}</option>
+                  ))}
                 </select>
               </div>
               <div className="flex items-center justify-between pt-2 border-t">
                 <div>
-                  <p className="font-medium">{isEn ? 'Concurrency' : '刷新并发数'}</p>
-                  <p className="text-sm text-muted-foreground">{isEn ? 'Number of accounts to refresh simultaneously' : '同时刷新的账号数量，过大可能卡顿'}</p>
+                  <p className="font-medium">{t('settings.autoRefresh.concurrency')}</p>
+                  <p className="text-sm text-muted-foreground">{t('settings.autoRefresh.concurrencyDesc')}</p>
                 </div>
                 <input
                   type="number"
@@ -415,21 +406,21 @@ export function SettingsPage() {
               </div>
               <div className="flex items-center justify-between pt-2 border-t">
                 <div>
-                  <p className="font-medium">{isEn ? 'Sync Account Info' : '同步检测账户信息'}</p>
-                  <p className="text-sm text-muted-foreground">{isEn ? 'Detect usage, subscription, and ban status' : '刷新 Token 时同步检测用量、订阅、封禁状态'}</p>
+                  <p className="font-medium">{t('settings.autoRefresh.syncInfo')}</p>
+                  <p className="text-sm text-muted-foreground">{t('settings.autoRefresh.syncInfoDesc')}</p>
                 </div>
                 <Button
                   variant={autoRefreshSyncInfo ? "default" : "outline"}
                   size="sm"
                   onClick={() => setAutoRefreshSyncInfo(!autoRefreshSyncInfo)}
                 >
-                  {autoRefreshSyncInfo ? (isEn ? 'On' : '已开启') : (isEn ? 'Off' : '已关闭')}
+                  {autoRefreshSyncInfo ? t('common.on') : t('common.off')}
                 </Button>
               </div>
               <div className="flex items-center justify-between pt-2 border-t">
                 <div>
-                  <p className="font-medium">{isEn ? 'Manual Trigger' : '手动触发'}</p>
-                  <p className="text-sm text-muted-foreground">{isEn ? 'Manually trigger auto-refresh for debugging' : '手动触发一次自动刷新流程（用于调试）'}</p>
+                  <p className="font-medium">{t('settings.autoRefresh.manualTrigger')}</p>
+                  <p className="text-sm text-muted-foreground">{t('settings.autoRefresh.manualTriggerDesc')}</p>
                 </div>
                 <Button
                   variant="outline"
@@ -437,7 +428,7 @@ export function SettingsPage() {
                   onClick={handleManualRefresh}
                   disabled={isManualRefreshing}
                 >
-                  {isManualRefreshing ? (isEn ? 'Refreshing...' : '刷新中...') : (isEn ? 'Trigger Now' : '立即触发')}
+                  {isManualRefreshing ? t('settings.autoRefresh.refreshing') : t('settings.autoRefresh.triggerNow')}
                 </Button>
               </div>
             </>
@@ -452,14 +443,14 @@ export function SettingsPage() {
             <div className="p-2 rounded-lg bg-primary/10">
               <Database className="h-4 w-4 text-primary" />
             </div>
-            {isEn ? 'API Settings' : 'API 设置'}
+            {t('settings.api.title')}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="font-medium">{isEn ? 'Usage API Type' : '用量查询 API'}</p>
-              <p className="text-sm text-muted-foreground">{isEn ? 'Select API type for querying usage limits' : '选择查询账户用量的 API 类型'}</p>
+              <p className="font-medium">{t('settings.api.usageApiType')}</p>
+              <p className="text-sm text-muted-foreground">{t('settings.api.usageApiTypeDesc')}</p>
             </div>
             <select
               className="w-[180px] h-9 px-3 rounded-lg border bg-background text-sm focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
@@ -472,8 +463,8 @@ export function SettingsPage() {
             </select>
           </div>
           <div className="text-xs text-muted-foreground bg-muted/50 rounded-lg p-3 space-y-1">
-            <p>• <strong>REST</strong>: {isEn ? 'Official Kiro IDE format, recommended' : '官方 Kiro IDE 使用的格式，推荐使用'}</p>
-            <p>• <strong>CBOR</strong>: {isEn ? 'Web portal format, may have different fields' : '网页端格式，字段可能有差异'}</p>
+            <p>• <strong>REST</strong>: {t('settings.api.restDesc')}</p>
+            <p>• <strong>CBOR</strong>: {t('settings.api.cborDesc')}</p>
           </div>
         </CardContent>
       </Card>
@@ -485,45 +476,45 @@ export function SettingsPage() {
             <div className="p-2 rounded-lg bg-primary/10">
               <Globe className="h-4 w-4 text-primary" />
             </div>
-            {isEn ? 'Proxy' : '代理设置'}
+            {t('settings.proxy.title')}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="font-medium">{isEn ? 'Enable Proxy' : '启用代理'}</p>
-              <p className="text-sm text-muted-foreground">{isEn ? 'All requests through proxy server' : '所有网络请求将通过代理服务器'}</p>
+              <p className="font-medium">{t('settings.proxy.enabled')}</p>
+              <p className="text-sm text-muted-foreground">{t('settings.proxy.enabledDesc')}</p>
             </div>
             <Button
               variant={proxyEnabled ? "default" : "outline"}
               size="sm"
               onClick={() => setProxy(!proxyEnabled, tempProxyUrl)}
             >
-              {proxyEnabled ? (isEn ? 'On' : '已开启') : (isEn ? 'Off' : '已关闭')}
+              {proxyEnabled ? t('common.on') : t('common.off')}
             </Button>
           </div>
 
           <div className="space-y-2 pt-2 border-t">
-            <label className="text-sm font-medium">{isEn ? 'Proxy URL' : '代理地址'}</label>
+            <label className="text-sm font-medium">{t('settings.proxy.url')}</label>
             <div className="flex gap-2">
               <input
                 type="text"
                 className="flex-1 h-9 px-3 rounded-lg border bg-background text-sm font-mono focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
-                placeholder="http://127.0.0.1:7890 或 socks5://127.0.0.1:1080"
+                placeholder={t('settings.proxy.urlPlaceholder')}
                 value={tempProxyUrl}
                 onChange={(e) => setTempProxyUrl(e.target.value)}
               />
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 size="sm"
                 onClick={() => setProxy(proxyEnabled, tempProxyUrl)}
                 disabled={tempProxyUrl === proxyUrl}
               >
-                {isEn ? 'Save' : '保存'}
+                {t('common.save')}
               </Button>
             </div>
             <p className="text-xs text-muted-foreground">
-              {isEn ? 'Supports HTTP/HTTPS/SOCKS5, format: protocol://host:port' : '支持 HTTP/HTTPS/SOCKS5 代理，格式: protocol://host:port'}
+              {t('settings.proxy.urlHint')}
             </p>
           </div>
         </CardContent>
@@ -536,21 +527,21 @@ export function SettingsPage() {
             <div className="p-2 rounded-lg bg-primary/10">
               <Repeat className="h-4 w-4 text-primary" />
             </div>
-            {isEn ? 'Auto Switch' : '自动换号'}
+            {t('settings.autoSwitch.title')}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="font-medium">{isEn ? 'Enable Auto Switch' : '启用自动换号'}</p>
-              <p className="text-sm text-muted-foreground">{isEn ? 'Auto switch when balance is low' : '余额不足时自动切换到其他可用账号'}</p>
+              <p className="font-medium">{t('settings.autoSwitch.enabled')}</p>
+              <p className="text-sm text-muted-foreground">{t('settings.autoSwitch.enabledDesc')}</p>
             </div>
             <Button
               variant={autoSwitchEnabled ? "default" : "outline"}
               size="sm"
               onClick={() => setAutoSwitch(!autoSwitchEnabled)}
             >
-              {autoSwitchEnabled ? (isEn ? 'On' : '已开启') : (isEn ? 'Off' : '已关闭')}
+              {autoSwitchEnabled ? t('common.on') : t('common.off')}
             </Button>
           </div>
 
@@ -558,8 +549,8 @@ export function SettingsPage() {
             <>
               <div className="flex items-center justify-between pt-2 border-t">
                 <div>
-                  <p className="font-medium">{isEn ? 'Balance Threshold' : '余额阈值'}</p>
-                  <p className="text-sm text-muted-foreground">{isEn ? 'Switch when balance below this' : '余额低于此值时自动切换'}</p>
+                  <p className="font-medium">{t('settings.autoSwitch.threshold')}</p>
+                  <p className="text-sm text-muted-foreground">{t('settings.autoSwitch.thresholdDesc')}</p>
                 </div>
                 <input
                   type="number"
@@ -574,21 +565,18 @@ export function SettingsPage() {
                 <div>
                   <p className="font-medium flex items-center gap-2">
                     <Clock className="h-4 w-4" />
-                    {isEn ? 'Check Interval' : '检查间隔'}
+                    {t('settings.autoSwitch.interval')}
                   </p>
-                  <p className="text-sm text-muted-foreground">{isEn ? 'How often to check balance' : '每隔多久检查一次余额'}</p>
+                  <p className="text-sm text-muted-foreground">{t('settings.autoSwitch.intervalDesc')}</p>
                 </div>
                 <select
                   className="h-9 px-3 rounded-lg border bg-background text-sm focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
                   value={autoSwitchInterval}
                   onChange={(e) => setAutoSwitch(true, undefined, parseInt(e.target.value))}
                 >
-                  <option value="1">{isEn ? '1 min' : '1 分钟'}</option>
-                  <option value="3">{isEn ? '3 min' : '3 分钟'}</option>
-                  <option value="5">{isEn ? '5 min' : '5 分钟'}</option>
-                  <option value="10">{isEn ? '10 min' : '10 分钟'}</option>
-                  <option value="15">{isEn ? '15 min' : '15 分钟'}</option>
-                  <option value="30">{isEn ? '30 min' : '30 分钟'}</option>
+                  {[1, 3, 5, 10, 15, 30].map(n => (
+                    <option key={n} value={n}>{t('settings.autoRefresh.minutes', { n })}</option>
+                  ))}
                 </select>
               </div>
             </>
@@ -603,14 +591,14 @@ export function SettingsPage() {
             <div className="p-2 rounded-lg bg-primary/10">
               <Layers className="h-4 w-4 text-primary" />
             </div>
-            {isEn ? 'Batch Import' : '批量导入'}
+            {t('settings.batchImport.title')}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="font-medium">{isEn ? 'Concurrency' : '并发数'}</p>
-              <p className="text-sm text-muted-foreground">{isEn ? 'Too high may cause API rate limiting' : '同时验证的账号数量，过大可能导致 API 限流'}</p>
+              <p className="font-medium">{t('settings.batchImport.concurrency')}</p>
+              <p className="text-sm text-muted-foreground">{t('settings.batchImport.concurrencyDesc')}</p>
             </div>
             <input
               type="number"
@@ -622,7 +610,7 @@ export function SettingsPage() {
             />
           </div>
           <p className="text-xs text-muted-foreground bg-muted/50 rounded-lg p-2">
-            {isEn ? 'Recommended: 10-100. Too high may cause failures, too low is slow.' : '建议范围: 10-100。设置过大可能导致大量「验证失败」，设置过小则导入速度较慢。'}
+            {t('settings.batchImport.hint')}
           </p>
         </CardContent>
       </Card>
@@ -634,25 +622,25 @@ export function SettingsPage() {
             <div className="p-2 rounded-lg bg-primary/10">
               <Monitor className="h-4 w-4 text-primary" />
             </div>
-            {isEn ? 'System Tray' : '系统托盘'}
+            {t('settings.tray.title')}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           {trayLoading ? (
-            <div className="text-sm text-muted-foreground">{isEn ? 'Loading...' : '加载中...'}</div>
+            <div className="text-sm text-muted-foreground">{t('common.loading')}</div>
           ) : (
             <>
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="font-medium">{isEn ? 'Enable System Tray' : '启用系统托盘'}</p>
-                  <p className="text-sm text-muted-foreground">{isEn ? 'Show icon in system tray' : '在系统托盘显示图标'}</p>
+                  <p className="font-medium">{t('settings.tray.enabled')}</p>
+                  <p className="text-sm text-muted-foreground">{t('settings.tray.enabledDesc')}</p>
                 </div>
                 <Button
                   variant={traySettings.enabled ? 'default' : 'outline'}
                   size="sm"
                   onClick={() => handleTraySettingChange('enabled', !traySettings.enabled)}
                 >
-                  {traySettings.enabled ? (isEn ? 'On' : '已开启') : (isEn ? 'Off' : '已关闭')}
+                  {traySettings.enabled ? t('common.on') : t('common.off')}
                 </Button>
               </div>
 
@@ -660,26 +648,26 @@ export function SettingsPage() {
                 <>
                   <div className="flex items-center justify-between pt-2 border-t">
                     <div>
-                      <p className="font-medium">{isEn ? 'Close Button Action' : '关闭按钮行为'}</p>
-                      <p className="text-sm text-muted-foreground">{isEn ? 'What happens when you click X' : '点击关闭按钮时的行为'}</p>
+                      <p className="font-medium">{t('settings.tray.closeAction')}</p>
+                      <p className="text-sm text-muted-foreground">{t('settings.tray.closeActionDesc')}</p>
                     </div>
                     <select
                       className="w-[140px] h-9 px-3 rounded-lg border bg-background text-sm focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
                       value={traySettings.closeAction}
                       onChange={(e) => handleTraySettingChange('closeAction', e.target.value)}
                     >
-                      <option value="ask">{isEn ? 'Ask every time' : '每次询问'}</option>
-                      <option value="minimize">{isEn ? 'Minimize to tray' : '最小化到托盘'}</option>
-                      <option value="quit">{isEn ? 'Quit application' : '退出程序'}</option>
+                      <option value="ask">{t('settings.tray.ask')}</option>
+                      <option value="minimize">{t('settings.tray.minimize')}</option>
+                      <option value="quit">{t('settings.tray.quit')}</option>
                     </select>
                   </div>
                 </>
               )}
 
               <div className="text-xs text-muted-foreground bg-muted/50 rounded-lg p-3 space-y-1">
-                <p>• {isEn ? 'Double-click tray icon to show window' : '双击托盘图标可以显示主窗口'}</p>
-                <p>• {isEn ? 'Right-click tray icon to show menu' : '右键托盘图标可以显示菜单'}</p>
-                <p>• {isEn ? 'Tray menu shows current account info and usage' : '托盘菜单可以查看当前账户信息和用量'}</p>
+                <p>• {t('settings.tray.hint1')}</p>
+                <p>• {t('settings.tray.hint2')}</p>
+                <p>• {t('settings.tray.hint3')}</p>
               </div>
             </>
           )}
@@ -693,29 +681,29 @@ export function SettingsPage() {
             <div className="p-2 rounded-lg bg-primary/10">
               <Settings className="h-4 w-4 text-primary" />
             </div>
-            {isEn ? 'Keyboard Shortcuts' : '快捷键'}
+            {t('settings.shortcuts.title')}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           {shortcutLoading ? (
-            <div className="text-sm text-muted-foreground">{isEn ? 'Loading...' : '加载中...'}</div>
+            <div className="text-sm text-muted-foreground">{t('common.loading')}</div>
           ) : (
             <>
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="font-medium">{isEn ? 'Show Window' : '显示主窗口'}</p>
-                  <p className="text-sm text-muted-foreground">{isEn ? 'Global shortcut to show main window' : '全局快捷键唤起主窗口'}</p>
+                  <p className="font-medium">{t('settings.shortcuts.showWindow')}</p>
+                  <p className="text-sm text-muted-foreground">{t('settings.shortcuts.showWindowDesc')}</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <input
                     type="text"
                     className={`w-[160px] h-9 px-3 rounded-lg border bg-background text-sm focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-center ${isRecordingShortcut ? 'border-primary ring-1 ring-primary animate-pulse' : ''}`}
-                    value={isRecordingShortcut ? (isEn ? 'Press keys...' : '请按键...') : showWindowShortcut}
+                    value={isRecordingShortcut ? t('settings.shortcuts.pressKeys') : showWindowShortcut}
                     onKeyDown={handleKeyDown}
                     onFocus={() => setIsRecordingShortcut(true)}
                     onBlur={() => setIsRecordingShortcut(false)}
                     readOnly
-                    placeholder={isEn ? 'Click to record' : '点击录制'}
+                    placeholder={t('settings.shortcuts.clickToRecord')}
                   />
                   {showWindowShortcut && (
                     <Button
@@ -733,9 +721,9 @@ export function SettingsPage() {
                 <p className="text-sm text-destructive">{shortcutError}</p>
               )}
               <div className="text-xs text-muted-foreground bg-muted/50 rounded-lg p-3 space-y-1">
-                <p>• {isEn ? 'Click input and press key combination to record' : '点击输入框后按下组合键自动录制'}</p>
-                <p>• {isEn ? 'macOS use Command, Windows/Linux use Ctrl' : 'macOS 使用 Command，Windows/Linux 使用 Ctrl'}</p>
-                <p>• {isEn ? 'Click trash icon to clear shortcut' : '点击垃圾桶图标可清除快捷键'}</p>
+                <p>• {t('settings.shortcuts.hint1')}</p>
+                <p>• {t('settings.shortcuts.hint2')}</p>
+                <p>• {t('settings.shortcuts.hint3')}</p>
               </div>
             </>
           )}
@@ -750,40 +738,40 @@ export function SettingsPage() {
             <div className="p-2 rounded-lg bg-primary/10">
               <Database className="h-4 w-4 text-primary" />
             </div>
-            {isEn ? 'Data Management' : '数据管理'}
+            {t('settings.data.title')}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="font-medium">{isEn ? 'Export Data' : '导出数据'}</p>
-              <p className="text-sm text-muted-foreground">{isEn ? 'Supports JSON, TXT, CSV, Clipboard' : '支持 JSON、TXT、CSV、剪贴板等多种格式'}</p>
+              <p className="font-medium">{t('settings.data.export')}</p>
+              <p className="text-sm text-muted-foreground">{t('settings.data.exportDesc')}</p>
             </div>
             <Button variant="outline" size="sm" onClick={handleExport}>
               <Download className="h-4 w-4 mr-2" />
-              {isEn ? 'Export' : '导出'}
+              {t('common.export')}
             </Button>
           </div>
 
           <div className="flex items-center justify-between pt-2 border-t">
             <div>
-              <p className="font-medium">{isEn ? 'Import Data' : '导入数据'}</p>
-              <p className="text-sm text-muted-foreground">{isEn ? 'Import accounts from JSON file' : '从 JSON 文件导入账号数据'}</p>
+              <p className="font-medium">{t('settings.data.import')}</p>
+              <p className="text-sm text-muted-foreground">{t('settings.data.importDesc')}</p>
             </div>
             <Button variant="outline" size="sm" onClick={handleImport} disabled={isImporting}>
               <Upload className="h-4 w-4 mr-2" />
-              {isImporting ? (isEn ? 'Importing...' : '导入中...') : (isEn ? 'Import' : '导入')}
+              {isImporting ? t('settings.data.importing') : t('common.import')}
             </Button>
           </div>
 
           <div className="flex items-center justify-between pt-2 border-t">
             <div>
-              <p className="font-medium text-destructive">{isEn ? 'Clear All Data' : '清除所有数据'}</p>
-              <p className="text-sm text-muted-foreground">{isEn ? 'Delete all accounts, groups and tags' : '删除所有账号、分组和标签'}</p>
+              <p className="font-medium text-destructive">{t('settings.dangerZone.clearData')}</p>
+              <p className="text-sm text-muted-foreground">{t('settings.dangerZone.clearDataDesc')}</p>
             </div>
             <Button variant="destructive" size="sm" onClick={handleClearData}>
               <Trash2 className="h-4 w-4 mr-2" />
-              {isEn ? 'Clear' : '清除'}
+              {t('settings.dangerZone.clearDataButton')}
             </Button>
           </div>
         </CardContent>

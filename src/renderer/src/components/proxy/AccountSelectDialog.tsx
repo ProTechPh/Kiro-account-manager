@@ -2,6 +2,8 @@ import { useState, useMemo } from 'react'
 import { X, Search, Check, User, CreditCard, Zap, Mail, AlertCircle, Ban } from 'lucide-react'
 import { Button, Card, CardContent, CardHeader, CardTitle, Input, Badge } from '../ui'
 import type { Account } from '../../types/account'
+import { getSubscriptionColor } from '@/lib/utils'
+import { useTranslation } from '@/hooks/useTranslation'
 
 interface AccountSelectDialogProps {
   open: boolean
@@ -20,6 +22,7 @@ export function AccountSelectDialog({
   onSelect,
   isEn
 }: AccountSelectDialogProps) {
+  const { t } = useTranslation()
   const [searchQuery, setSearchQuery] = useState('')
 
   const accountList = useMemo(() => {
@@ -57,19 +60,6 @@ export function AccountSelectDialog({
     return `${usage.current.toFixed(1)} / ${usage.limit}`
   }
 
-  const getSubscriptionColor = (title?: string): string => {
-    if (!title) return 'bg-gray-500 text-white'
-    const t = title.toUpperCase()
-    // KIRO PRO+ / PRO_PLUS - 紫色
-    if (t.includes('PRO+') || t.includes('PRO_PLUS') || t.includes('PROPLUS')) return 'bg-purple-500 text-white'
-    // KIRO POWER - 金色
-    if (t.includes('POWER')) return 'bg-amber-500 text-white'
-    // KIRO PRO - 蓝色
-    if (t.includes('PRO')) return 'bg-blue-500 text-white'
-    // KIRO FREE - 灰色
-    return 'bg-gray-500 text-white'
-  }
-
   // 检测是否为封禁账号（通过 lastError 判断）
   const isBannedAccount = (acc: Account): boolean => {
     return acc.lastError?.includes('UnauthorizedException') || 
@@ -81,28 +71,28 @@ export function AccountSelectDialog({
     if (isBannedAccount(acc)) {
       return {
         icon: <Ban className="h-3.5 w-3.5" />,
-        text: isEn ? 'Banned' : '已封禁',
+        text: t('accountSelect.banned'),
         color: 'bg-red-500/10 text-red-500'
       }
     }
-    
+
     switch (acc.status) {
       case 'error':
         return {
           icon: <AlertCircle className="h-3.5 w-3.5" />,
-          text: isEn ? 'Error' : '错误',
+          text: t('accountSelect.error'),
           color: 'bg-red-500/10 text-red-500'
         }
       case 'expired':
         return {
           icon: <Ban className="h-3.5 w-3.5" />,
-          text: isEn ? 'Expired' : '已过期',
+          text: t('accountSelect.expired'),
           color: 'bg-orange-500/10 text-orange-500'
         }
       case 'refreshing':
         return {
           icon: <Zap className="h-3.5 w-3.5" />,
-          text: isEn ? 'Refreshing' : '刷新中',
+          text: t('accountSelect.refreshing'),
           color: 'bg-yellow-500/10 text-yellow-500'
         }
       case 'active':
@@ -120,7 +110,7 @@ export function AccountSelectDialog({
       <Card className="relative w-[600px] max-h-[80vh] shadow-2xl border-0 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
         <CardHeader className="pb-3 border-b sticky top-0 bg-background z-10">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-lg">{isEn ? 'Select Account' : '选择账号'}</CardTitle>
+            <CardTitle className="text-lg">{t('accountSelect.title')}</CardTitle>
             <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>
               <X className="h-4 w-4" />
             </Button>
@@ -128,7 +118,7 @@ export function AccountSelectDialog({
           <div className="relative mt-3">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder={isEn ? 'Search by email, ID or subscription...' : '搜索邮箱、ID 或订阅类型...'}
+              placeholder={t('accountSelect.searchPlaceholder')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-9"
@@ -149,9 +139,9 @@ export function AccountSelectDialog({
                   <Zap className="h-5 w-5 text-muted-foreground" />
                 </div>
                 <div>
-                  <div className="font-medium">{isEn ? 'First Available' : '第一个可用账号'}</div>
+                  <div className="font-medium">{t('accountSelect.firstAvailable')}</div>
                   <div className="text-sm text-muted-foreground">
-                    {isEn ? 'Automatically use the first available account' : '自动使用第一个可用的账号'}
+                    {t('accountSelect.firstAvailableDesc')}
                   </div>
                 </div>
               </div>
@@ -164,7 +154,7 @@ export function AccountSelectDialog({
           {/* 账号列表 */}
           {filteredAccounts.length === 0 ? (
             <div className="p-8 text-center text-muted-foreground">
-              {searchQuery ? (isEn ? 'No accounts found' : '未找到匹配的账号') : (isEn ? 'No accounts available' : '暂无可用账号')}
+            {searchQuery ? t('accountSelect.noResults') : t('accountSelect.noAccounts')}
             </div>
           ) : (
             filteredAccounts.map(acc => {
@@ -219,12 +209,12 @@ export function AccountSelectDialog({
                         
                         {/* 订阅类型和使用量 */}
                         <div className="flex items-center gap-3 mt-2">
-                          <Badge className={`text-xs ${getSubscriptionColor(acc.subscription?.title)}`}>
+                          <Badge className={`text-xs text-white ${getSubscriptionColor(acc.subscription?.title || '')}`}>
                             <CreditCard className="h-3 w-3 mr-1" />
                             {acc.subscription?.title || 'Unknown'}
                           </Badge>
                           <span className="text-xs text-muted-foreground">
-                            {isEn ? 'Usage' : '使用量'}: {usageText}
+                          {t('accountSelect.usage')}: {usageText}
                           </span>
                         </div>
                         

@@ -6,7 +6,6 @@ import { useTranslation } from '../hooks/useTranslation'
 
 export function CloseConfirmDialog() {
   const { t } = useTranslation()
-  const isEn = t('common.unknown') === 'Unknown'
   const [open, setOpen] = useState(false)
   const [rememberChoice, setRememberChoice] = useState(false)
 
@@ -38,8 +37,8 @@ export function CloseConfirmDialog() {
                 <XCircle className="h-6 w-6 text-primary" />
               </div>
               <div>
-                <h2 className="text-lg font-bold">{isEn ? 'Close Window' : '关闭窗口'}</h2>
-                <p className="text-sm text-muted-foreground">{isEn ? 'Choose an action' : '请选择关闭行为'}</p>
+                <h2 className="text-lg font-bold">{t('closeConfirm.title')}</h2>
+                <p className="text-sm text-muted-foreground">{t('closeConfirm.subtitle')}</p>
               </div>
             </div>
             <button
@@ -54,17 +53,17 @@ export function CloseConfirmDialog() {
         {/* 内容 */}
         <div className="p-6 space-y-4">
           <p className="text-sm text-muted-foreground">
-            {isEn ? 'Would you like to minimize to system tray or exit the application?' : '您想要最小化到系统托盘还是退出程序？'}
+            {t('closeConfirm.description')}
           </p>
-          
+
           <p className="text-xs text-muted-foreground bg-muted/50 rounded-lg p-3">
-            {isEn ? 'When minimized to tray, the app will continue running in the background and the proxy service will remain available. You can reopen the window by clicking the tray icon.' : '最小化到托盘后，程序将在后台继续运行，代理服务保持可用。您可以通过点击托盘图标重新打开窗口。'}
+            {t('closeConfirm.hint')}
           </p>
 
           {/* 操作按钮 */}
           <div className="space-y-2">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               className="w-full justify-start gap-3 h-12"
               onClick={() => handleAction('minimize')}
             >
@@ -72,13 +71,13 @@ export function CloseConfirmDialog() {
                 <Minimize2 className="h-4 w-4 text-blue-500" />
               </div>
               <div className="text-left">
-                <div className="font-medium">{isEn ? 'Minimize to Tray' : '最小化到托盘'}</div>
-                <div className="text-xs text-muted-foreground">{isEn ? 'Continue running in background' : '在后台继续运行'}</div>
+                <div className="font-medium">{t('closeConfirm.minimize')}</div>
+                <div className="text-xs text-muted-foreground">{t('closeConfirm.minimizeDesc')}</div>
               </div>
             </Button>
-            
-            <Button 
-              variant="outline" 
+
+            <Button
+              variant="outline"
               className="w-full justify-start gap-3 h-12"
               onClick={() => handleAction('quit')}
             >
@@ -86,8 +85,8 @@ export function CloseConfirmDialog() {
                 <LogOut className="h-4 w-4 text-red-500" />
               </div>
               <div className="text-left">
-                <div className="font-medium">{isEn ? 'Exit Application' : '退出程序'}</div>
-                <div className="text-xs text-muted-foreground">{isEn ? 'Close the app completely' : '完全关闭应用'}</div>
+                <div className="font-medium">{t('closeConfirm.quit')}</div>
+                <div className="text-xs text-muted-foreground">{t('closeConfirm.quitDesc')}</div>
               </div>
             </Button>
           </div>
@@ -98,8 +97,8 @@ export function CloseConfirmDialog() {
               type="button"
               onClick={() => setRememberChoice(!rememberChoice)}
               className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${
-                rememberChoice 
-                  ? 'bg-primary border-primary' 
+                rememberChoice
+                  ? 'bg-primary border-primary'
                   : 'border-muted-foreground/50 hover:border-primary'
               }`}
             >
@@ -110,17 +109,17 @@ export function CloseConfirmDialog() {
               onClick={() => setRememberChoice(!rememberChoice)}
               className="text-sm text-muted-foreground cursor-pointer select-none"
             >
-              {isEn ? 'Remember my choice' : '记住我的选择'}
+              {t('closeConfirm.remember')}
             </button>
           </div>
 
           {/* 取消按钮 */}
-          <Button 
-            variant="ghost" 
+          <Button
+            variant="ghost"
             className="w-full"
             onClick={() => handleAction('cancel')}
           >
-            {isEn ? 'Cancel' : '取消'}
+            {t('common.cancel')}
           </Button>
         </div>
       </div>

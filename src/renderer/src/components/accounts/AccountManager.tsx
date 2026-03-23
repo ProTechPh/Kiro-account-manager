@@ -32,7 +32,6 @@ export function AccountManager({ onBack }: AccountManagerProps): React.ReactNode
   const [showExportDialog, setShowExportDialog] = useState(false)
   const [isFilterExpanded, setIsFilterExpanded] = useState(false)
   const { t } = useTranslation()
-  const isEn = t('common.unknown') === 'Unknown'
 
   // 获取要导出的账号列表
   const getExportAccounts = () => {
@@ -90,15 +89,15 @@ export function AccountManager({ onBack }: AccountManagerProps): React.ReactNode
           const result = importFromExportData(data)
           const skippedInfo = result.errors.find(e => e.id === 'skipped')
           const skippedMsg = skippedInfo ? `，${skippedInfo.error}` : ''
-          alert(`导入完成：成功 ${result.success} 个${skippedMsg}`)
+          alert(t('accounts.importComplete', { success: result.success, skipped: skippedMsg }))
         } else {
-          alert('无效的 JSON 文件格式')
+          alert(t('accounts.invalidJson'))
         }
       } else if (format === 'csv') {
         // CSV 格式：邮箱,昵称,登录方式,RefreshToken,ClientId,ClientSecret,Region
         const lines = content.split('\n').filter(line => line.trim())
         if (lines.length < 2) {
-          alert('CSV 文件为空或只有标题行')
+          alert(t('accounts.csvEmpty'))
           return
         }
 
@@ -117,16 +116,16 @@ export function AccountManager({ onBack }: AccountManagerProps): React.ReactNode
         }).filter(item => item.email && item.refreshToken)
 
         if (items.length === 0) {
-          alert('未找到有效的账号数据（需要邮箱和 RefreshToken）')
+          alert(t('accounts.noValidAccounts'))
           return
         }
 
         const result = importAccounts(items)
-        alert(`导入完成：成功 ${result.success} 个，失败 ${result.failed} 个`)
+        alert(t('accounts.importResult', { success: result.success, failed: result.failed }))
       } else if (format === 'txt') {
         // TXT 格式：每行一个账号，格式为 邮箱,RefreshToken 或 邮箱|RefreshToken
         const lines = content.split('\n').filter(line => line.trim() && !line.startsWith('#'))
-        
+
         const items = lines.map(line => {
           // 支持逗号或竖线分隔
           const parts = line.includes('|') ? line.split('|') : line.split(',')
@@ -139,18 +138,18 @@ export function AccountManager({ onBack }: AccountManagerProps): React.ReactNode
         }).filter(item => item.email && item.refreshToken)
 
         if (items.length === 0) {
-          alert('未找到有效的账号数据（格式：邮箱,RefreshToken）')
+          alert(t('accounts.noValidAccounts'))
           return
         }
 
         const result = importAccounts(items)
-        alert(`导入完成：成功 ${result.success} 个，失败 ${result.failed} 个`)
+        alert(t('accounts.importResult', { success: result.success, failed: result.failed }))
       } else {
-        alert(`不支持的文件格式：${format}`)
+        alert(t('accounts.unsupportedFormat', { format }))
       }
     } catch (e) {
       console.error('Import error:', e)
-      alert('解析导入文件失败')
+      alert(t('accounts.parseFailed'))
     }
   }
 
@@ -174,7 +173,7 @@ export function AccountManager({ onBack }: AccountManagerProps): React.ReactNode
       <div className="flex items-center justify-center h-full">
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="text-muted-foreground">加载账号数据...</p>
+          <p className="text-muted-foreground">{t('accounts.loading')}</p>
         </div>
       </div>
     )
@@ -194,7 +193,7 @@ export function AccountManager({ onBack }: AccountManagerProps): React.ReactNode
             <div className="p-2 rounded-lg bg-primary/10">
               <Users className="h-5 w-5 text-primary" />
             </div>
-            <h1 className="text-lg font-semibold text-primary">{isEn ? 'Accounts' : '账户管理'}</h1>
+            <h1 className="text-lg font-semibold text-primary">{t('accounts.title')}</h1>
           </div>
         </div>
         

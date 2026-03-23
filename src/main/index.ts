@@ -142,16 +142,31 @@ const KIRO_AUTH_ENDPOINT = 'https://prod.us-east-1.auth.desktop.kiro.dev'
 // 设置代理环境变量
 function applyProxySettings(enabled: boolean, url: string): void {
   if (enabled && url) {
+    // Set env vars for http/https module usage
     process.env.HTTP_PROXY = url
     process.env.HTTPS_PROXY = url
     process.env.http_proxy = url
     process.env.https_proxy = url
+    // Set undici global dispatcher so Node built-in fetch() respects the proxy
+    try {
+      const { ProxyAgent, setGlobalDispatcher } = require('undici')
+      setGlobalDispatcher(new ProxyAgent(url))
+    } catch (e) {
+      console.warn('[Proxy] undici ProxyAgent not available:', e)
+    }
     console.log(`[Proxy] Enabled: ${url}`)
   } else {
     delete process.env.HTTP_PROXY
     delete process.env.HTTPS_PROXY
     delete process.env.http_proxy
     delete process.env.https_proxy
+    // Reset undici dispatcher to default
+    try {
+      const { Agent, setGlobalDispatcher } = require('undici')
+      setGlobalDispatcher(new Agent())
+    } catch (e) {
+      // ignore
+    }
     console.log('[Proxy] Disabled')
   }
 }

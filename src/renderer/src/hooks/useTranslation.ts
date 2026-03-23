@@ -85,7 +85,8 @@ export function useTranslation() {
   return {
     t,
     language,
-    actualLanguage
+    actualLanguage,
+    isEn: actualLanguage === 'en'
   }
 }
 

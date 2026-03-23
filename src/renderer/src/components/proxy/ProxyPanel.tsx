@@ -4,7 +4,6 @@ import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Inpu
 import { useAccountsStore } from '../../store/accounts'
 import { useTranslation } from '../../hooks/useTranslation'
 import { ProxyLogsDialog } from './ProxyLogsDialog'
-import { ProxyDetailedLogsDialog } from './ProxyDetailedLogsDialog'
 import { ModelsDialog } from './ModelsDialog'
 import { ModelMappingDialog } from './ModelMappingDialog'
 import { AccountSelectDialog } from './AccountSelectDialog'
@@ -67,8 +66,7 @@ interface ProxyConfig {
 }
 
 export function ProxyPanel() {
-  const { t } = useTranslation()
-  const isEn = t('common.unknown') === 'Unknown'
+  const { t, isEn } = useTranslation()
   const [isRunning, setIsRunning] = useState(false)
   const [config, setConfig] = useState<ProxyConfig>({
     enabled: false,
@@ -90,7 +88,6 @@ export function ProxyPanel() {
   const [syncSuccess, setSyncSuccess] = useState(false)
   const [refreshSuccess, setRefreshSuccess] = useState(false)
   const [showLogsDialog, setShowLogsDialog] = useState(false)
-  const [showDetailedLogsDialog, setShowDetailedLogsDialog] = useState(false)
   const [showModelsDialog, setShowModelsDialog] = useState(false)
   const [showModelMappingDialog, setShowModelMappingDialog] = useState(false)
   const [availableModels, setAvailableModels] = useState<Array<{ id: string; name: string }>>([])
@@ -223,7 +220,7 @@ export function ProxyPanel() {
         setIsRunning(true)
         await fetchStatus()
       } else {
-        setError(result.error || (isEn ? 'Failed to start' : '启动失败'))
+        setError(result.error || t('proxyPanel.startFailed'))
       }
     } catch (err) {
       setError((err as Error).message)
@@ -242,7 +239,7 @@ export function ProxyPanel() {
         setIsRunning(false)
         setStats(null)
       } else {
-        setError(result.error || (isEn ? 'Failed to stop' : '停止失败'))
+        setError(result.error || t('proxyPanel.stopFailed'))
       }
     } catch (err) {
       setError((err as Error).message)
@@ -269,7 +266,7 @@ export function ProxyPanel() {
         setRefreshSuccess(true)
         setTimeout(() => setRefreshSuccess(false), 2000)
       } else {
-        setError(result.error || (isEn ? 'Failed to refresh models' : '刷新模型失败'))
+        setError(result.error || t('proxyPanel.refreshModelsFailed'))
       }
     } catch (err) {
       setError((err as Error).message)
@@ -394,9 +391,9 @@ export function ProxyPanel() {
                 <Server className="h-5 w-5 text-primary" />
               </div>
               <div>
-                <CardTitle className="text-lg text-primary">{isEn ? 'Kiro API Proxy' : 'Kiro API 反代'}</CardTitle>
+                <CardTitle className="text-lg text-primary">{t('proxyPanel.title')}</CardTitle>
                 <CardDescription>
-                  {isEn ? 'Provides OpenAI and Claude compatible API endpoints' : '提供 OpenAI 和 Claude 兼容的 API 端点'}
+                  {t('proxyPanel.description')}
                 </CardDescription>
               </div>
             </div>
@@ -416,7 +413,7 @@ export function ProxyPanel() {
                   ? 'relative inline-flex rounded-full h-2 w-2 bg-white' 
                   : 'relative inline-flex rounded-full h-2 w-2 bg-muted-foreground'}></span>
               </span>
-              {isRunning ? (isEn ? 'Running' : '运行中') : (isEn ? 'Stopped' : '已停止')}
+              {isRunning ? t('proxyPanel.running') : t('proxyPanel.stopped')}
             </Badge>
           </div>
         </CardHeader>
@@ -426,25 +423,25 @@ export function ProxyPanel() {
             {!isRunning ? (
               <Button onClick={handleStart} className="gap-2">
                 <Play className="h-4 w-4" />
-                {isEn ? 'Start Service' : '启动服务'}
+                {t('proxyPanel.startService')}
               </Button>
             ) : (
               <Button onClick={handleStop} variant="destructive" className="gap-2" disabled={isStopping}>
                 {isStopping ? <Loader2 className="h-4 w-4 animate-spin" /> : <Square className="h-4 w-4" />}
-                {isStopping ? (isEn ? 'Stopping...' : '停止中...') : (isEn ? 'Stop Service' : '停止服务')}
+                {isStopping ? t('proxyPanel.stopping') : t('proxyPanel.stopService')}
               </Button>
             )}
             <Button onClick={syncAccounts} variant="outline" className="gap-2" disabled={!isRunning || isSyncing}>
               {isSyncing ? <Loader2 className="h-4 w-4 animate-spin" /> : syncSuccess ? <Check className="h-4 w-4 text-green-500" /> : <RefreshCw className="h-4 w-4" />}
-              {isSyncing ? (isEn ? 'Syncing...' : '同步中...') : syncSuccess ? (isEn ? 'Synced!' : '已同步') : (isEn ? 'Sync Accounts' : '同步账号')}
+              {isSyncing ? t('proxyPanel.syncing') : syncSuccess ? t('proxyPanel.synced') : t('proxyPanel.syncAccounts')}
             </Button>
             <Button onClick={handleRefreshModels} variant="outline" className="gap-2" disabled={!isRunning || isRefreshingModels}>
               {isRefreshingModels ? <Loader2 className="h-4 w-4 animate-spin" /> : refreshSuccess ? <Check className="h-4 w-4 text-green-500" /> : <RefreshCw className="h-4 w-4" />}
-              {isRefreshingModels ? (isEn ? 'Refreshing...' : '刷新中...') : refreshSuccess ? (isEn ? 'Refreshed!' : '已刷新') : (isEn ? 'Refresh Models' : '刷新模型')}
+              {isRefreshingModels ? t('proxyPanel.refreshing') : refreshSuccess ? t('proxyPanel.refreshed') : t('proxyPanel.refreshModels')}
             </Button>
             <Button onClick={() => setShowModelsDialog(true)} variant="outline" className="gap-2" disabled={!isRunning}>
               <Cpu className="h-4 w-4" />
-              {isEn ? 'View Models' : '查看模型'}
+              {t('proxyPanel.viewModels')}
             </Button>
           </div>
 
@@ -459,7 +456,7 @@ export function ProxyPanel() {
           {/* 服务地址 */}
           {isRunning && (
             <div className="flex items-center gap-2">
-              <Label className="min-w-[80px]">{isEn ? 'Address:' : '服务地址:'}</Label>
+              <Label className="min-w-[80px]">{t('proxyPanel.address')}</Label>
               <code className="flex-1 px-3 py-2 bg-muted rounded text-sm">
                 http://{config.host}:{config.port}
               </code>
@@ -472,7 +469,7 @@ export function ProxyPanel() {
           {/* 配置 */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="port">{isEn ? 'Port' : '端口'}</Label>
+              <Label htmlFor="port">{t('proxyPanel.port')}</Label>
               <Input
                 id="port"
                 type="number"
@@ -487,7 +484,7 @@ export function ProxyPanel() {
             </div>
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label htmlFor="host">{isEn ? 'Host' : '监听地址'}</Label>
+                <Label htmlFor="host">{t('proxyPanel.host')}</Label>
                 <div className="flex items-center gap-1.5">
                   <Switch
                     id="publicAccess"
@@ -500,7 +497,7 @@ export function ProxyPanel() {
                     disabled={isRunning}
                     className="scale-75"
                   />
-                  <Label htmlFor="publicAccess" className="text-xs cursor-pointer">{isEn ? 'Public' : '外网'}</Label>
+                  <Label htmlFor="publicAccess" className="text-xs cursor-pointer">{t('proxyPanel.public')}</Label>
                 </div>
               </div>
               <Input
@@ -518,13 +515,13 @@ export function ProxyPanel() {
 
           {/* API Key 配置 */}
           <div className="space-y-2">
-            <Label htmlFor="apiKey">{isEn ? 'API Key (Optional)' : 'API Key (可选)'}</Label>
+            <Label htmlFor="apiKey">{t('proxyPanel.apiKey')}</Label>
             <div className="flex gap-2">
               <div className="relative flex-1">
                 <Input
                   id="apiKey"
                   type={showApiKey ? 'text' : 'password'}
-                  placeholder={isEn ? 'Leave empty to skip auth' : '留空则不验证'}
+                  placeholder={t('proxyPanel.apiKeyPlaceholder')}
                   value={config.apiKey || ''}
                   onChange={(e) => {
                     const newApiKey = e.target.value || undefined
@@ -540,7 +537,7 @@ export function ProxyPanel() {
                   size="icon"
                   className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
                   onClick={() => setShowApiKey(!showApiKey)}
-                  title={showApiKey ? (isEn ? 'Hide' : '隐藏') : (isEn ? 'Show' : '显示')}
+                  title={showApiKey ? t('proxyPanel.hide') : t('proxyPanel.show')}
                 >
                   {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </Button>
@@ -560,7 +557,7 @@ export function ProxyPanel() {
                 size="icon"
                 onClick={generateApiKey}
                 disabled={isRunning}
-                title={isEn ? 'Generate Random Key' : '随机生成'}
+                title={t('proxyPanel.generateKey')}
                 className={apiKeyGenerated ? 'border-green-500 text-green-500' : ''}
               >
                 {apiKeyGenerated ? <Check className="h-4 w-4" /> : <Dices className="h-4 w-4" />}
@@ -570,7 +567,7 @@ export function ProxyPanel() {
                   variant="outline"
                   size="icon"
                   onClick={copyApiKey}
-                  title={isEn ? 'Copy API Key' : '复制 API Key'}
+                  title={t('proxyPanel.copyApiKey')}
                   className={apiKeyCopied ? 'border-green-500 text-green-500' : ''}
                 >
                   {apiKeyCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
@@ -580,13 +577,13 @@ export function ProxyPanel() {
                 variant="outline"
                 size="icon"
                 onClick={() => setShowApiKeyManager(true)}
-                title={isEn ? 'Manage Multiple API Keys' : '管理多个 API Key'}
+                title={t('proxyPanel.manageApiKeys')}
                 className="text-xs w-auto px-2"
               >
-                {isEn ? 'Manage' : '管理'}
+                {t('proxyPanel.manage')}
               </Button>
             </div>
-            <p className="text-xs text-muted-foreground">{isEn ? 'When set, requests must provide this key in Authorization or X-Api-Key header' : '设置后，请求需要在 Authorization 或 X-Api-Key 头中提供此密钥'}</p>
+            <p className="text-xs text-muted-foreground">{t('proxyPanel.apiKeyHint')}</p>
           </div>
 
           <div className="flex items-center justify-between flex-wrap gap-2">
@@ -599,7 +596,7 @@ export function ProxyPanel() {
                   window.api.proxyUpdateConfig({ autoStart: checked })
                 }}
               />
-              <Label htmlFor="autoStart">{isEn ? 'Auto Start' : '随软件启动'}</Label>
+              <Label htmlFor="autoStart">{t('proxyPanel.autoStart')}</Label>
             </div>
             <div className="flex items-center gap-2">
               <Switch
@@ -611,7 +608,7 @@ export function ProxyPanel() {
                 }}
                 disabled={isRunning}
               />
-              <Label htmlFor="multiAccount">{isEn ? 'Multi-Account' : '多账号轮询'}</Label>
+              <Label htmlFor="multiAccount">{t('proxyPanel.multiAccount')}</Label>
             </div>
             {/* 关闭多账号轮询时显示账号选择按钮和自动切换开关 */}
             {!config.enableMultiAccount && (
@@ -627,10 +624,10 @@ export function ProxyPanel() {
                     {config.selectedAccountId ? (
                       (() => {
                         const acc = accounts.get(config.selectedAccountId)
-                        return acc ? (acc.email || acc.id.substring(0, 12) + '...') : (isEn ? 'First Available' : '第一个可用账号')
+                        return acc ? (acc.email || acc.id.substring(0, 12) + '...') : t('accountSelect.firstAvailable')
                       })()
                     ) : (
-                      isEn ? 'First Available' : '第一个可用账号'
+                      t('accountSelect.firstAvailable')
                     )}
                   </Button>
                 </div>
@@ -645,7 +642,7 @@ export function ProxyPanel() {
                     disabled={isRunning}
                   />
                   <Label htmlFor="autoSwitchOnQuotaExhausted" className="text-sm">
-                    {isEn ? 'Auto-switch on quota exhausted' : '额度耗尽自动切换账号'}
+                    {t('proxyPanel.autoSwitchQuota')}
                   </Label>
                 </div>
               </>
@@ -659,33 +656,33 @@ export function ProxyPanel() {
                   window.api.proxyUpdateConfig({ logRequests: checked })
                 }}
               />
-              <Label htmlFor="logRequests">{isEn ? 'Log Requests' : '记录日志'}</Label>
+              <Label htmlFor="logRequests">{t('proxyPanel.logRequests')}</Label>
             </div>
           </div>
 
           {/* 高级配置 */}
           <div className="border-t border-border pt-4 mt-4">
-            <h4 className="text-sm font-medium mb-3 text-foreground">{isEn ? 'Advanced Settings' : '高级配置'}</h4>
+            <h4 className="text-sm font-medium mb-3 text-foreground">{t('proxyPanel.advancedSettings')}</h4>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="preferredEndpoint">{isEn ? 'Preferred Endpoint' : '首选端点'}</Label>
+                <Label htmlFor="preferredEndpoint">{t('proxyPanel.preferredEndpoint')}</Label>
                 <Select
                   value={config.preferredEndpoint || ''}
                   options={[
-                    { value: '', label: isEn ? 'Auto Select' : '自动选择', description: isEn ? 'Auto select based on availability' : '根据可用性自动选择端点' },
-                    { value: 'codewhisperer', label: 'CodeWhisperer', description: isEn ? 'IDE mode endpoint' : 'IDE 模式端点' },
-                    { value: 'amazonq', label: 'AmazonQ', description: isEn ? 'CLI mode endpoint' : 'CLI 模式端点' }
+                    { value: '', label: t('proxyPanel.autoSelect'), description: t('proxyPanel.autoSelectDesc') },
+                    { value: 'codewhisperer', label: 'CodeWhisperer', description: t('proxyPanel.ideEndpoint') },
+                    { value: 'amazonq', label: 'AmazonQ', description: t('proxyPanel.cliEndpoint') }
                   ]}
                   onChange={(value) => {
                     const endpoint = value as 'codewhisperer' | 'amazonq' | undefined || undefined
                     setConfig(prev => ({ ...prev, preferredEndpoint: endpoint }))
                     window.api.proxyUpdateConfig({ preferredEndpoint: endpoint })
                   }}
-                  placeholder={isEn ? 'Select endpoint' : '选择端点'}
+                  placeholder={t('proxyPanel.selectEndpoint')}
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="maxRetries">{isEn ? 'Max Retries' : '最大重试次数'}</Label>
+                <Label htmlFor="maxRetries">{t('proxyPanel.maxRetries')}</Label>
                 <Input
                   id="maxRetries"
                   type="number"
@@ -701,7 +698,7 @@ export function ProxyPanel() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="autoContinueRounds">{isEn ? 'Auto Continue Rounds' : '自动继续轮数'}</Label>
+                <Label htmlFor="autoContinueRounds">{t('proxyPanel.autoContinueRounds')}</Label>
                 <Input
                   id="autoContinueRounds"
                   type="number"
@@ -715,12 +712,12 @@ export function ProxyPanel() {
                   }}
                   disabled={isRunning}
                 />
-                <p className="text-xs text-muted-foreground">{isEn ? '0 = disabled. Auto-send "Continue" after tool calls.' : '0 = 禁用。工具调用后自动发送"继续"。'}</p>
+                <p className="text-xs text-muted-foreground">{t('proxyPanel.autoContinueHint')}</p>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="disableTools">{isEn ? 'Disable Tool Calls' : '禁用工具调用'}</Label>
+                <Label htmlFor="disableTools">{t('proxyPanel.disableTools')}</Label>
                 <div className="flex items-center justify-between h-9 px-3 rounded-md border border-input bg-transparent">
-                  <span className="text-sm text-muted-foreground">{isEn ? 'AI will not call any tools' : 'AI 不会调用任何工具'}</span>
+                  <span className="text-sm text-muted-foreground">{t('proxyPanel.disableToolsDesc')}</span>
                   <Switch
                     id="disableTools"
                     checked={config.disableTools || false}
@@ -733,7 +730,7 @@ export function ProxyPanel() {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label>{isEn ? 'Model Thinking Mode' : '模型思考模式'}</Label>
+                <Label>{t('proxyPanel.modelThinkingMode')}</Label>
                 <div className="grid grid-cols-4 gap-2 px-3 py-2 rounded-md border border-input bg-transparent">
                   {['claude-sonnet-4', 'claude-sonnet-4.5', 'claude-opus-4.5', 'claude-haiku-4.5'].map(model => (
                     <div key={model} className="flex items-center gap-1.5">
@@ -750,16 +747,16 @@ export function ProxyPanel() {
                     </div>
                   ))}
                 </div>
-                <p className="text-xs text-muted-foreground">{isEn ? 'Auto-enable Extended Thinking for selected models' : '为选中的模型自动启用扩展思考模式'}</p>
+                <p className="text-xs text-muted-foreground">{t('proxyPanel.thinkingModeHint')}</p>
               </div>
               <div className="space-y-2">
-                <Label>{isEn ? 'Thinking Output Format' : '思考内容输出格式'}</Label>
+                <Label>{t('proxyPanel.thinkingOutputFormat')}</Label>
                 <Select
                   value={(config as any).thinkingOutputFormat || 'reasoning_content'}
                   options={[
-                    { value: 'reasoning_content', label: 'reasoning_content', description: isEn ? 'DeepSeek compatible' : 'DeepSeek 兼容' },
-                    { value: 'thinking', label: '<thinking>', description: isEn ? 'Claude native' : 'Claude 原生' },
-                    { value: 'think', label: '<think>', description: isEn ? 'OpenAI compatible' : 'OpenAI 兼容' }
+                    { value: 'reasoning_content', label: 'reasoning_content', description: t('proxyPanel.deepseekCompat') },
+                    { value: 'thinking', label: '<thinking>', description: t('proxyPanel.claudeNative') },
+                    { value: 'think', label: '<think>', description: t('proxyPanel.openaiCompat') }
                   ]}
                   onChange={(value) => {
                     if (isRunning) return
@@ -768,7 +765,7 @@ export function ProxyPanel() {
                   }}
                   className={isRunning ? 'opacity-50 pointer-events-none' : ''}
                 />
-                <p className="text-xs text-muted-foreground">{isEn ? 'Choose how thinking content is returned in API response' : '选择思考内容在 API 响应中的返回格式'}</p>
+                <p className="text-xs text-muted-foreground">{t('proxyPanel.thinkingOutputHint')}</p>
               </div>
             </div>
           </div>
@@ -782,7 +779,7 @@ export function ProxyPanel() {
             <CardContent className="pt-3 pb-3">
               <div className="flex items-center gap-1 text-xs text-muted-foreground mb-1">
                 <Users className="h-3 w-3" />
-                <span>{isEn ? 'Pool' : '账号池'}</span>
+                <span>{t('proxyPanel.pool')}</span>
               </div>
               <div className="text-xl font-bold text-foreground">{availableCount}/{accountCount}</div>
             </CardContent>
@@ -792,7 +789,7 @@ export function ProxyPanel() {
               <div className="flex items-center justify-between mb-1">
                 <div className="flex items-center gap-1 text-xs text-muted-foreground">
                   <Activity className="h-3 w-3" />
-                  <span>{isEn ? 'Total' : '总请求'}</span>
+                  <span>{t('proxyPanel.totalRequests')}</span>
                 </div>
                 <Button
                   variant="ghost"
@@ -808,7 +805,7 @@ export function ProxyPanel() {
                       setSessionStats(result.sessionStats as SessionStats)
                     }
                   }}
-                  title={isEn ? 'Reset Statistics' : '重置统计'}
+                  title={t('proxyPanel.resetStats')}
                 >
                   <RotateCcw className="h-3 w-3" />
                 </Button>
@@ -820,7 +817,7 @@ export function ProxyPanel() {
             <CardContent className="pt-3 pb-3">
               <div className="flex items-center gap-1 text-xs text-muted-foreground mb-1">
                 <Check className="h-3 w-3" />
-                <span>{isEn ? 'Total S/F' : '总计成功/失败'}</span>
+                <span>{t('proxyPanel.totalSF')}</span>
               </div>
               <div className="text-xl font-bold">
                 <span className="text-green-500">{stats?.successRequests || 0}</span>
@@ -833,7 +830,7 @@ export function ProxyPanel() {
             <CardContent className="pt-3 pb-3">
               <div className="flex items-center gap-1 text-xs text-muted-foreground mb-1">
                 <Zap className="h-3 w-3" />
-                <span>{isEn ? 'Session' : '本次请求'}</span>
+                <span>{t('proxyPanel.session')}</span>
               </div>
               <div className="text-xl font-bold text-foreground">{sessionStats?.totalRequests || 0}</div>
             </CardContent>
@@ -842,7 +839,7 @@ export function ProxyPanel() {
             <CardContent className="pt-3 pb-3">
               <div className="flex items-center gap-1 text-xs text-muted-foreground mb-1">
                 <Activity className="h-3 w-3" />
-                <span>{isEn ? 'Session S/F' : '本次成功/失败'}</span>
+                <span>{t('proxyPanel.sessionSF')}</span>
               </div>
               <div className="text-xl font-bold">
                 <span className="text-green-500">{sessionStats?.successRequests || 0}</span>
@@ -855,7 +852,7 @@ export function ProxyPanel() {
             <CardContent className="pt-3 pb-3">
               <div className="flex items-center gap-1 text-xs text-muted-foreground mb-1">
                 <Clock className="h-3 w-3" />
-                <span>{isEn ? 'Uptime' : '运行时间'}</span>
+                <span>{t('proxyPanel.uptime')}</span>
               </div>
               <div className="text-xl font-bold text-primary whitespace-nowrap">{formatUptime(uptime)}</div>
             </CardContent>
@@ -870,56 +867,56 @@ export function ProxyPanel() {
             <div className="p-1.5 rounded-lg bg-primary/10">
               <Globe className="h-4 w-4 text-primary" />
             </div>
-            {isEn ? 'API Endpoints' : 'API 端点'}
+            {t('proxyPanel.apiEndpoints')}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-1.5 text-sm">
           <div className="flex items-center gap-2">
             <span className="text-orange-500 w-11 flex-shrink-0 font-mono">POST</span>
             <code className="text-muted-foreground flex-1 font-mono">/v1/chat/completions</code>
-            <span className="text-xs text-muted-foreground">{isEn ? 'OpenAI Compatible' : 'OpenAI 兼容'}</span>
+            <span className="text-xs text-muted-foreground">{t('proxyPanel.openaiCompat')}</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-orange-500 w-11 flex-shrink-0 font-mono">POST</span>
             <code className="text-muted-foreground flex-1 font-mono">/v1/messages</code>
-            <span className="text-xs text-muted-foreground">{isEn ? 'Claude Compatible' : 'Claude 兼容'}</span>
+            <span className="text-xs text-muted-foreground">{t('proxyPanel.claudeCompat')}</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-orange-500 w-11 flex-shrink-0 font-mono">POST</span>
             <code className="text-muted-foreground flex-1 font-mono">/anthropic/v1/messages</code>
-            <span className="text-xs text-muted-foreground">{isEn ? 'Claude Code' : 'Claude Code'}</span>
+            <span className="text-xs text-muted-foreground">Claude Code</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-orange-500 w-11 flex-shrink-0 font-mono">POST</span>
             <code className="text-muted-foreground flex-1 font-mono">/v1/messages/count_tokens</code>
-            <span className="text-xs text-muted-foreground">{isEn ? 'Token Count' : 'Token 计数'}</span>
+            <span className="text-xs text-muted-foreground">{t('proxyPanel.tokenCount')}</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-green-500 w-11 flex-shrink-0 font-mono">GET</span>
             <code className="text-muted-foreground flex-1 font-mono">/v1/models</code>
-            <span className="text-xs text-muted-foreground">{isEn ? 'Model List' : '模型列表'}</span>
+            <span className="text-xs text-muted-foreground">{t('proxyPanel.modelList')}</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-green-500 w-11 flex-shrink-0 font-mono">GET</span>
             <code className="text-muted-foreground flex-1 font-mono">/health</code>
-            <span className="text-xs text-muted-foreground">{isEn ? 'Health Check' : '健康检查'}</span>
+            <span className="text-xs text-muted-foreground">{t('proxyPanel.healthCheck')}</span>
           </div>
           <div className="border-t pt-2 mt-2 space-y-1.5">
-            <div className="text-xs text-muted-foreground mb-1">{isEn ? 'Admin API (Requires API Key)' : '管理 API (需要 API Key)'}</div>
+            <div className="text-xs text-muted-foreground mb-1">{t('proxyPanel.adminApi')}</div>
             <div className="flex items-center gap-2">
               <span className="text-green-500 w-11 flex-shrink-0 font-mono">GET</span>
               <code className="text-muted-foreground flex-1 font-mono">/admin/stats</code>
-              <span className="text-xs text-muted-foreground">{isEn ? 'Detailed Stats' : '详细统计'}</span>
+              <span className="text-xs text-muted-foreground">{t('proxyPanel.detailedStats')}</span>
             </div>
             <div className="flex items-center gap-2">
               <span className="text-green-500 w-11 flex-shrink-0 font-mono">GET</span>
               <code className="text-muted-foreground flex-1 font-mono">/admin/accounts</code>
-              <span className="text-xs text-muted-foreground">{isEn ? 'Account List' : '账号列表'}</span>
+              <span className="text-xs text-muted-foreground">{t('proxyPanel.accountList')}</span>
             </div>
             <div className="flex items-center gap-2">
               <span className="text-green-500 w-11 flex-shrink-0 font-mono">GET</span>
               <code className="text-muted-foreground flex-1 font-mono">/admin/logs</code>
-              <span className="text-xs text-muted-foreground">{isEn ? 'Request Logs' : '请求日志'}</span>
+              <span className="text-xs text-muted-foreground">{t('proxyLogs.title')}</span>
             </div>
           </div>
         </CardContent>
@@ -934,17 +931,13 @@ export function ProxyPanel() {
                 <div className="p-1.5 rounded-lg bg-primary/10">
                   <Activity className="h-4 w-4 text-primary" />
                 </div>
-                {isEn ? 'Recent Requests' : '最近请求'}
+                {t('proxyPanel.recentRequests')}
               </CardTitle>
               <div className="flex items-center gap-2">
                 <Badge variant="secondary" className="text-xs">{recentLogs.length}</Badge>
                 <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setShowLogsDialog(true)}>
                   <FileText className="h-3 w-3 mr-1" />
-                  {isEn ? 'View All' : '查看全部'}
-                </Button>
-                <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setShowDetailedLogsDialog(true)}>
-                  <Activity className="h-3 w-3 mr-1" />
-                  {isEn ? 'Detailed Logs' : '详细日志'}
+                  {t('proxyPanel.viewAll')}
                 </Button>
               </div>
             </div>
@@ -975,42 +968,42 @@ export function ProxyPanel() {
             <div className="p-1.5 rounded-lg bg-primary/10">
               <Zap className="h-4 w-4 text-primary" />
             </div>
-            {isEn ? 'Supported Features' : '支持的功能'}
+            {t('proxyPanel.supportedFeatures')}
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
             <div className="flex items-center gap-2">
               <span className="text-primary">✓</span>
-              <span className="text-foreground">{isEn ? 'Auto Token Refresh' : 'Token 自动刷新'}</span>
+              <span className="text-foreground">{t('proxyPanel.featureAutoRefresh')}</span>
             </div>
             <div className="flex items-center gap-2">
               <span className="text-primary">✓</span>
-              <span className="text-foreground">{isEn ? 'Request Retry' : '请求重试机制'}</span>
+              <span className="text-foreground">{t('proxyPanel.featureRetry')}</span>
             </div>
             <div className="flex items-center gap-2">
               <span className="text-primary">✓</span>
-              <span className="text-foreground">{isEn ? 'Multi-Account Rotation' : '多账号轮询'}</span>
+              <span className="text-foreground">{t('proxyPanel.featureMultiAccount')}</span>
             </div>
             <div className="flex items-center gap-2">
               <span className="text-primary">✓</span>
-              <span className="text-foreground">{isEn ? 'IDC/Social Auth' : 'IDC/Social 认证'}</span>
+              <span className="text-foreground">{t('proxyPanel.featureAuth')}</span>
             </div>
             <div className="flex items-center gap-2">
               <span className="text-primary">✓</span>
-              <span className="text-foreground">{isEn ? 'Agentic Mode Detection' : 'Agentic 模式检测'}</span>
+              <span className="text-foreground">{t('proxyPanel.featureAgentic')}</span>
             </div>
             <div className="flex items-center gap-2">
               <span className="text-primary">✓</span>
-              <span className="text-foreground">{isEn ? 'Thinking Mode Support' : 'Thinking 模式支持'}</span>
+              <span className="text-foreground">{t('proxyPanel.featureThinking')}</span>
             </div>
             <div className="flex items-center gap-2">
               <span className="text-primary">✓</span>
-              <span className="text-foreground">{isEn ? 'Image Processing' : '图像处理'}</span>
+              <span className="text-foreground">{t('proxyPanel.featureImage')}</span>
             </div>
             <div className="flex items-center gap-2">
               <span className="text-primary">✓</span>
-              <span className="text-foreground">{isEn ? 'Usage Statistics' : '使用量统计'}</span>
+              <span className="text-foreground">{t('proxyPanel.featureStats')}</span>
             </div>
           </div>
         </CardContent>
@@ -1036,12 +1029,6 @@ export function ProxyPanel() {
           fetchStatus()
         }}
         isEn={isEn}
-      />
-
-      {/* 详细日志弹窗 */}
-      <ProxyDetailedLogsDialog
-        open={showDetailedLogsDialog}
-        onOpenChange={setShowDetailedLogsDialog}
       />
 
       {/* 模型列表弹窗 */}
@@ -1098,7 +1085,7 @@ export function ProxyPanel() {
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowApiKeyManager(false)} />
           <div className="relative bg-background rounded-lg shadow-lg w-[800px] max-h-[80vh] overflow-y-auto p-4">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold">{isEn ? 'API Key Management' : 'API Key 管理'}</h2>
+              <h2 className="text-lg font-semibold">{t('proxyPanel.apiKeyManagement')}</h2>
               <Button variant="ghost" size="icon" onClick={() => setShowApiKeyManager(false)}>✕</Button>
             </div>
             <ApiKeyManager />

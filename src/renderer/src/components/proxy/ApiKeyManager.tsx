@@ -3,11 +3,12 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
-import { 
-  Key, Plus, Trash2, Copy, Check, RefreshCw, Eye, EyeOff, 
+import {
+  Key, Plus, Trash2, Copy, Check, RefreshCw, Eye, EyeOff,
   BarChart3, Clock, Zap, MessageSquare, ExternalLink
 } from 'lucide-react'
 import { Select } from '@/components/ui'
+import { formatDate } from '@/lib/utils'
 import { cn } from '@/lib/utils'
 import { useAccountsStore } from '@/store/accounts'
 import { ApiKeyUsageDialog } from './ApiKeyUsageDialog'
@@ -53,9 +54,10 @@ interface ApiKey {
   usageHistory?: UsageRecord[]
 }
 
+import { useTranslation } from '@/hooks/useTranslation'
+
 export function ApiKeyManager() {
-  const { language } = useAccountsStore()
-  const isEn = language === 'en'
+  const { t } = useTranslation()
   
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([])
   const [loading, setLoading] = useState(true)
@@ -105,7 +107,7 @@ export function ApiKeyManager() {
   }
 
   const handleDeleteKey = async (id: string) => {
-    if (!confirm(isEn ? 'Delete this API key?' : '确定删除此 API Key？')) return
+    if (!confirm(t('apiKeyManager.deleteConfirm'))) return
     
     try {
       const result = await window.api.proxyDeleteApiKey(id)
@@ -130,7 +132,7 @@ export function ApiKeyManager() {
   }
 
   const handleResetUsage = async (id: string) => {
-    if (!confirm(isEn ? 'Reset usage statistics?' : '确定重置用量统计？')) return
+    if (!confirm(t('apiKeyManager.resetConfirm'))) return
     
     try {
       const result = await window.api.proxyResetApiKeyUsage(id)
@@ -160,11 +162,6 @@ export function ApiKeyManager() {
     })
   }
 
-  const formatDate = (timestamp: number) => {
-    const date = new Date(timestamp)
-    return `${date.toLocaleDateString()} ${date.toLocaleTimeString()}`
-  }
-
   const maskKey = (key: string) => {
     return key.substring(0, 8) + '...' + key.substring(key.length - 4)
   }
@@ -186,21 +183,21 @@ export function ApiKeyManager() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Key className="h-5 w-5 text-primary" />
-              <CardTitle className="text-lg">{isEn ? 'API Keys' : 'API 密钥'}</CardTitle>
+              <CardTitle className="text-lg">{t('apiKeyManager.title')}</CardTitle>
             </div>
             <span className="text-sm text-muted-foreground">
-              {apiKeys.length} {isEn ? 'keys' : '个'}
+              {t('apiKeyManager.keys', { n: apiKeys.length })}
             </span>
           </div>
           <CardDescription>
-            {isEn ? 'Manage API keys for authentication' : '管理用于身份验证的 API 密钥'}
+            {t('apiKeyManager.description')}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <div className="flex gap-2">
               <Input
-                placeholder={isEn ? 'Key name...' : '密钥名称...'}
+              placeholder={t('apiKeyManager.namePlaceholder')}
                 value={newKeyName}
                 onChange={e => setNewKeyName(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleAddKey()}
@@ -218,26 +215,26 @@ export function ApiKeyManager() {
               />
               <Button onClick={handleAddKey} disabled={!newKeyName.trim()}>
                 <Plus className="h-4 w-4 mr-1" />
-                {isEn ? 'Add' : '添加'}
+                {t('apiKeyManager.add')}
               </Button>
             </div>
             <div className="flex gap-2 items-center">
               <Input
                 type="number"
-                placeholder={isEn ? 'Credits limit (optional)' : 'Credits 额度限制（可选）'}
+                placeholder={t('apiKeyManager.creditsLimitPlaceholder')}
                 value={newKeyCreditsLimit}
                 onChange={e => setNewKeyCreditsLimit(e.target.value)}
                 className="flex-1"
               />
               <span className="text-xs text-muted-foreground whitespace-nowrap">
-                {isEn ? '0 = unlimited' : '0 = 无限制'}
+                {t('apiKeyManager.unlimited')}
               </span>
             </div>
           </div>
 
           {apiKeys.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              {isEn ? 'No API keys yet' : '暂无 API 密钥'}
+              {t('apiKeyManager.noKeys')}
             </div>
           ) : (
             <div className="space-y-2">
@@ -280,7 +277,7 @@ export function ApiKeyManager() {
                   </div>
 
                   <div className="text-right text-xs text-muted-foreground">
-                    <div>{apiKey.usage.totalRequests} {isEn ? 'requests' : '请求'}</div>
+                    <div>{apiKey.usage.totalRequests} {t('apiKeyManager.requests')}</div>
                     <div className={cn(
                       apiKey.creditsLimit && apiKey.usage.totalCredits >= apiKey.creditsLimit && "text-destructive font-medium"
                     )}>
@@ -310,17 +307,17 @@ export function ApiKeyManager() {
               <div className="flex items-center gap-2">
                 <BarChart3 className="h-5 w-5 text-primary" />
                 <CardTitle className="text-lg">
-                  {isEn ? 'Usage Details' : '用量详情'}: {selectedKeyData.name}
+                  {t('apiKeyManager.usageDetails')}: {selectedKeyData.name}
                 </CardTitle>
               </div>
               <div className="flex gap-2">
                 <Button variant="outline" size="sm" onClick={() => setShowUsageDialog(true)}>
                   <ExternalLink className="h-3 w-3 mr-1" />
-                  {isEn ? 'View Details' : '查看详情'}
+                  {t('apiKeyManager.viewDetails')}
                 </Button>
                 <Button variant="outline" size="sm" onClick={() => handleResetUsage(selectedKeyData.id)}>
                   <RefreshCw className="h-3 w-3 mr-1" />
-                  {isEn ? 'Reset Usage' : '重置用量'}
+                  {t('apiKeyManager.resetUsage')}
                 </Button>
               </div>
             </div>
@@ -330,7 +327,7 @@ export function ApiKeyManager() {
               <div className="bg-muted/50 rounded-lg p-3">
                 <div className="flex items-center gap-2 text-muted-foreground mb-1">
                   <MessageSquare className="h-4 w-4" />
-                  <span className="text-xs">{isEn ? 'Total Requests' : '总请求数'}</span>
+                  <span className="text-xs">{t('apiKeyManager.totalRequests')}</span>
                 </div>
                 <div className="text-2xl font-bold">{selectedKeyData.usage.totalRequests}</div>
               </div>
@@ -338,21 +335,21 @@ export function ApiKeyManager() {
               <div className="bg-muted/50 rounded-lg p-3">
                 <div className="flex items-center gap-2 text-muted-foreground mb-1">
                   <Zap className="h-4 w-4" />
-                  <span className="text-xs">{isEn ? 'Total Credits' : '总 Credits'}</span>
+                  <span className="text-xs">{t('apiKeyManager.totalCredits')}</span>
                 </div>
                 <div className="text-2xl font-bold">{selectedKeyData.usage.totalCredits.toFixed(2)}</div>
               </div>
               
               <div className="bg-muted/50 rounded-lg p-3">
                 <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                  <span className="text-xs">{isEn ? 'Input Tokens' : '输入 Tokens'}</span>
+                  <span className="text-xs">{t('apiKeyManager.inputTokens')}</span>
                 </div>
                 <div className="text-2xl font-bold">{selectedKeyData.usage.totalInputTokens.toLocaleString()}</div>
               </div>
               
               <div className="bg-muted/50 rounded-lg p-3">
                 <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                  <span className="text-xs">{isEn ? 'Output Tokens' : '输出 Tokens'}</span>
+                  <span className="text-xs">{t('apiKeyManager.outputTokens')}</span>
                 </div>
                 <div className="text-2xl font-bold">{selectedKeyData.usage.totalOutputTokens.toLocaleString()}</div>
               </div>
@@ -360,10 +357,10 @@ export function ApiKeyManager() {
 
             <div className="mt-4 space-y-3">
               <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">{isEn ? 'Credits Limit:' : 'Credits 额度限制:'}</span>
+                <span className="text-sm text-muted-foreground">{t('apiKeyManager.creditsLimit')}</span>
                 <Input
                   type="number"
-                  placeholder={isEn ? 'Unlimited' : '无限制'}
+                  placeholder={t('apiKeyManager.unlimited')}
                   value={selectedKeyData.creditsLimit || ''}
                   onChange={async (e) => {
                     const limit = e.target.value ? parseFloat(e.target.value) : null
@@ -376,17 +373,17 @@ export function ApiKeyManager() {
                   }}
                   className="w-32 h-8"
                 />
-                <span className="text-xs text-muted-foreground">{isEn ? '(0 = unlimited)' : '(0 = 无限制)'}</span>
+                <span className="text-xs text-muted-foreground">{t('apiKeyManager.unlimitedParens')}</span>
               </div>
               <div className="text-xs text-muted-foreground space-y-1">
                 <div className="flex items-center gap-2">
                   <Clock className="h-3 w-3" />
-                  <span>{isEn ? 'Created:' : '创建时间:'} {formatDate(selectedKeyData.createdAt)}</span>
+                  <span>{t('apiKeyManager.created')} {formatDate(selectedKeyData.createdAt)}</span>
                 </div>
                 {selectedKeyData.lastUsedAt && (
                   <div className="flex items-center gap-2">
                     <Clock className="h-3 w-3" />
-                    <span>{isEn ? 'Last used:' : '最后使用:'} {formatDate(selectedKeyData.lastUsedAt)}</span>
+                    <span>{t('apiKeyManager.lastUsed')} {formatDate(selectedKeyData.lastUsedAt)}</span>
                   </div>
                 )}
               </div>

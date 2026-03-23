@@ -3,21 +3,8 @@ import { useAccountsStore } from '@/store/accounts'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui'
 import { Users, CheckCircle, AlertTriangle, Clock, Zap, Shield, Download, FolderPlus, Tag, TrendingUp, Activity, BarChart3 } from 'lucide-react'
 import kiroLogo from '@/assets/kiro-high-resolution-logo-transparent.png'
-import { cn } from '@/lib/utils'
+import { cn, getSubscriptionColor } from '@/lib/utils'
 import { useTranslation } from '@/hooks/useTranslation'
-
-// 订阅类型颜色映射
-const getSubscriptionColor = (type: string, title?: string): string => {
-  const text = (title || type).toUpperCase()
-  // KIRO PRO+ / PRO_PLUS - 紫色
-  if (text.includes('PRO+') || text.includes('PRO_PLUS') || text.includes('PROPLUS')) return 'bg-purple-500'
-  // KIRO POWER - 金色
-  if (text.includes('POWER')) return 'bg-amber-500'
-  // KIRO PRO - 蓝色
-  if (text.includes('PRO')) return 'bg-blue-500'
-  // KIRO FREE - 灰色
-  return 'bg-gray-500'
-}
 
 export function HomePage() {
   const { accounts, getStats, usagePrecision } = useAccountsStore()
@@ -51,10 +38,7 @@ export function HomePage() {
     
     // Initial fetch
     fetchStatus()
-    
-    // Poll every 3 seconds
-    const interval = setInterval(fetchStatus, 3000)
-    
+
     // Listen for status changes
     const unsubscribe = window.api.onProxyStatusChange?.((status) => {
       setGatewayStatus({
@@ -62,9 +46,8 @@ export function HomePage() {
         port: status.port
       })
     })
-    
+
     return () => {
-      clearInterval(interval)
       unsubscribe?.()
     }
   }, [])
@@ -100,33 +83,32 @@ export function HomePage() {
     }
   }, [accounts])
 
-  const isEn = t('common.unknown') === 'Unknown'
   const statCards = [
-    { 
-      label: isEn ? 'Total Accounts' : '总账号数', 
-      value: stats.total, 
-      icon: Users, 
+    {
+      label: t('home.totalAccounts'),
+      value: stats.total,
+      icon: Users,
       color: 'text-blue-500',
       bgColor: 'bg-blue-500/10'
     },
-    { 
-      label: isEn ? 'Active' : '正常账号', 
-      value: stats.byStatus?.active || 0, 
-      icon: CheckCircle, 
+    {
+      label: t('home.activeAccounts'),
+      value: stats.byStatus?.active || 0,
+      icon: CheckCircle,
       color: 'text-green-500',
       bgColor: 'bg-green-500/10'
     },
-    { 
-      label: isEn ? 'Banned' : '已封禁', 
-      value: stats.byStatus?.error || 0, 
-      icon: AlertTriangle, 
+    {
+      label: t('status.banned'),
+      value: stats.byStatus?.error || 0,
+      icon: AlertTriangle,
       color: 'text-red-500',
       bgColor: 'bg-red-500/10'
     },
-    { 
-      label: isEn ? 'Expiring Soon' : '即将过期', 
-      value: stats.expiringSoonCount, 
-      icon: Clock, 
+    {
+      label: t('accounts.filters.expiring'),
+      value: stats.expiringSoonCount,
+      icon: Clock,
       color: 'text-amber-500',
       bgColor: 'bg-amber-500/10'
     },
@@ -149,10 +131,10 @@ export function HomePage() {
           </div>
           <div>
             <h1 className="text-3xl font-bold text-foreground tracking-tight">
-              {isEn ? 'Welcome to Kiro' : '欢迎使用 Kiro'}
+              {t('home.welcomeTitle')}
             </h1>
             <p className="text-muted-foreground font-medium">
-              {isEn ? 'Manage your Kiro IDE accounts, one-click switch' : '管理你的 Kiro IDE 账号，一键切换，高效开发'}
+              {t('home.welcomeDesc')}
             </p>
           </div>
         </div>
@@ -171,22 +153,20 @@ export function HomePage() {
               <div className="flex items-center gap-3">
                 <Activity className="h-6 w-6 text-lime-900" />
                 <span className="text-sm font-semibold text-lime-900 tracking-wide uppercase">
-                  {isEn ? 'Gateway Status' : '网关状态'}
+                  {t('home.gatewayStatus')}
                 </span>
               </div>
               <div className="px-3 py-1 rounded-full bg-black text-[#EBFD93] text-xs font-bold uppercase tracking-wider">
-                {isEn ? 'ACTIVE' : '运行中'}
+                {t('home.gatewayActive')}
               </div>
             </div>
 
             <div>
               <h2 className="text-5xl lg:text-6xl font-bold tracking-tighter text-lime-950 mb-2">
-                {isEn ? 'ONLINE' : '在线'}
+                {t('home.gatewayOnline')}
               </h2>
               <p className="text-lime-800 font-medium text-sm font-mono">
-                {isEn 
-                  ? `Running server on port: ${gatewayStatus.port || 5580}`
-                  : `服务运行在端口: ${gatewayStatus.port || 5580}`}
+                {t('home.gatewayPort', { port: gatewayStatus.port || 5580 })}
               </p>
             </div>
           </div>
@@ -198,20 +178,20 @@ export function HomePage() {
               <div className="flex items-center gap-3">
                 <Activity className="h-6 w-6 text-muted-foreground" />
                 <span className="text-sm font-semibold text-muted-foreground tracking-wide uppercase">
-                  {isEn ? 'Gateway Status' : '网关状态'}
+                  {t('home.gatewayStatus')}
                 </span>
               </div>
               <div className="px-3 py-1 rounded-full bg-muted text-muted-foreground text-xs font-bold uppercase tracking-wider">
-                {isEn ? 'OFFLINE' : '离线'}
+                {t('home.gatewayOffline')}
               </div>
             </div>
 
             <div>
               <h2 className="text-5xl lg:text-6xl font-bold tracking-tighter text-muted-foreground mb-2">
-                {isEn ? 'STOPPED' : '已停止'}
+                {t('home.gatewayStopped')}
               </h2>
               <p className="text-muted-foreground font-medium text-sm">
-                {isEn ? 'Ready to initialize connection' : '准备初始化连接'}
+                {t('home.gatewayReady')}
               </p>
             </div>
           </div>
@@ -248,9 +228,9 @@ export function HomePage() {
               <div className="p-2.5 rounded-xl bg-muted">
                 <BarChart3 className="h-5 w-5 text-foreground" />
               </div>
-              {isEn ? 'Usage Stats' : '额度统计'}
+              {t('home.usageStats')}
               <span className="text-xs font-normal text-muted-foreground">
-                ({isEn ? `Based on ${usageStats.validAccountCount} valid accounts` : `基于 ${usageStats.validAccountCount} 个有效账号`})
+                ({t('home.basedOnAccounts', { count: usageStats.validAccountCount })})
               </span>
             </CardTitle>
           </CardHeader>
@@ -259,28 +239,28 @@ export function HomePage() {
               <div className="p-4 bg-muted rounded-[20px]">
                 <div className="flex items-center gap-2 mb-2">
                   <TrendingUp className="h-4 w-4 text-blue-500" />
-                  <span className="text-xs text-muted-foreground font-medium">{isEn ? 'Total' : '总额度'}</span>
+                  <span className="text-xs text-muted-foreground font-medium">{t('home.totalQuotaLabel')}</span>
                 </div>
                 <p className="text-2xl font-bold tracking-tight text-foreground">{usageStats.totalLimit.toLocaleString()}</p>
               </div>
               <div className="p-4 bg-muted rounded-[20px]">
                 <div className="flex items-center gap-2 mb-2">
                   <Activity className="h-4 w-4 text-orange-500" />
-                  <span className="text-xs text-muted-foreground font-medium">{isEn ? 'Used' : '已使用'}</span>
+                  <span className="text-xs text-muted-foreground font-medium">{t('home.usedQuota')}</span>
                 </div>
                 <p className="text-2xl font-bold tracking-tight text-foreground">{usageStats.totalUsed.toLocaleString()}</p>
               </div>
               <div className="p-4 bg-muted rounded-[20px]">
                 <div className="flex items-center gap-2 mb-2">
                   <Zap className="h-4 w-4 text-green-500" />
-                  <span className="text-xs text-muted-foreground font-medium">{isEn ? 'Remaining' : '剩余额度'}</span>
+                  <span className="text-xs text-muted-foreground font-medium">{t('home.remainingQuota')}</span>
                 </div>
                 <p className="text-2xl font-bold tracking-tight text-green-600">{usageStats.remaining.toLocaleString()}</p>
               </div>
               <div className="p-4 bg-muted rounded-[20px]">
                 <div className="flex items-center gap-2 mb-2">
                   <BarChart3 className="h-4 w-4 text-purple-500" />
-                  <span className="text-xs text-muted-foreground font-medium">{isEn ? 'Usage %' : '使用率'}</span>
+                  <span className="text-xs text-muted-foreground font-medium">{t('home.usagePercent')}</span>
                 </div>
                 <p className="text-2xl font-bold tracking-tight text-foreground">{usageStats.percentUsed.toFixed(usagePrecision ? 2 : 1)}%</p>
               </div>
@@ -288,7 +268,7 @@ export function HomePage() {
             {/* Progress bar */}
             <div className="space-y-2">
               <div className="flex justify-between text-xs text-muted-foreground font-medium">
-                <span>{isEn ? 'Overall Progress' : '总体使用进度'}</span>
+                <span>{t('home.overallProgress')}</span>
                 <span>{usageStats.totalUsed.toLocaleString()} / {usageStats.totalLimit.toLocaleString()}</span>
               </div>
               <div className="h-3 bg-muted rounded-full overflow-hidden">
@@ -313,7 +293,7 @@ export function HomePage() {
           <CardHeader className="pb-3">
             <CardTitle className="text-lg flex items-center gap-2 font-bold tracking-tight">
               <Zap className="h-5 w-5 text-foreground" />
-              {isEn ? 'Current Account' : '当前使用账号'}
+              {t('home.currentAccountTitle')}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -345,7 +325,7 @@ export function HomePage() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-2 border-t">
               {/* 用量 */}
               <div className="space-y-1">
-                <p className="text-xs text-muted-foreground">{isEn ? 'Monthly Usage' : '本月用量'}</p>
+                <p className="text-xs text-muted-foreground">{t('home.monthlyUsage')}</p>
                 <p className="text-sm font-medium">
                   {activeAccount.usage?.current || 0} / {activeAccount.usage?.limit || 0}
                 </p>
@@ -365,33 +345,33 @@ export function HomePage() {
 
               {/* 订阅剩余 */}
               <div className="space-y-1">
-                <p className="text-xs text-muted-foreground">{isEn ? 'Subscription' : '订阅剩余'}</p>
+                <p className="text-xs text-muted-foreground">{t('home.subscriptionRemaining')}</p>
                 <p className="text-sm font-medium">
-                  {activeAccount.subscription?.daysRemaining != null 
-                    ? (isEn ? `${activeAccount.subscription.daysRemaining} days` : `${activeAccount.subscription.daysRemaining} 天`)
-                    : (isEn ? 'Permanent' : '永久')}
+                  {activeAccount.subscription?.daysRemaining != null
+                    ? t('home.daysCount', { n: activeAccount.subscription.daysRemaining })
+                    : t('home.permanent')}
                 </p>
               </div>
 
               {/* Token 状态 */}
               <div className="space-y-1">
-                <p className="text-xs text-muted-foreground">{isEn ? 'Token Status' : 'Token 状态'}</p>
+                <p className="text-xs text-muted-foreground">{t('home.tokenStatus')}</p>
                 {(() => {
                   const expiresAt = activeAccount.credentials?.expiresAt
-                  if (!expiresAt) return <p className="text-sm font-medium text-muted-foreground">{isEn ? 'Unknown' : '未知'}</p>
+                  if (!expiresAt) return <p className="text-sm font-medium text-muted-foreground">{t('common.unknown')}</p>
                   const now = Date.now()
                   const remaining = expiresAt - now
-                  if (remaining <= 0) return <p className="text-sm font-medium text-red-500">{isEn ? 'Expired' : '已过期'}</p>
+                  if (remaining <= 0) return <p className="text-sm font-medium text-red-500">{t('time.expired')}</p>
                   const minutes = Math.floor(remaining / 60000)
-                  if (minutes < 60) return <p className="text-sm font-medium text-amber-500">{isEn ? `${minutes} min` : `${minutes} 分钟`}</p>
+                  if (minutes < 60) return <p className="text-sm font-medium text-amber-500">{t('home.minutesLeft', { n: minutes })}</p>
                   const hours = Math.floor(minutes / 60)
-                  return <p className="text-sm font-medium text-green-500">{isEn ? `${hours} hours` : `${hours} 小时`}</p>
+                  return <p className="text-sm font-medium text-green-500">{t('home.hoursLeft', { n: hours })}</p>
                 })()}
               </div>
 
               {/* 登录方式 */}
               <div className="space-y-1">
-                <p className="text-xs text-muted-foreground">{isEn ? 'Auth Method' : '登录方式'}</p>
+                <p className="text-xs text-muted-foreground">{t('home.authMethod')}</p>
                 <p className="text-sm font-medium">
                   {activeAccount.credentials?.authMethod === 'social' 
                     ? (activeAccount.credentials?.provider || 'Social')
@@ -402,33 +382,33 @@ export function HomePage() {
 
             {/* 订阅详情 */}
             <div className="pt-3 border-t space-y-2">
-              <p className="text-xs font-medium text-muted-foreground">{isEn ? 'Subscription Details' : '订阅详情'}</p>
+              <p className="text-xs font-medium text-muted-foreground">{t('home.subscriptionDetails')}</p>
               <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
                 <div className="flex items-center gap-2">
-                  <span className="text-muted-foreground">{isEn ? 'Type:' : '订阅类型:'}</span>
+                  <span className="text-muted-foreground">{t('home.subscriptionType')}</span>
                   <span className="font-medium">{activeAccount.subscription?.title || activeAccount.subscription?.type || 'Free'}</span>
                 </div>
                 {activeAccount.subscription?.rawType && (
                   <div className="flex items-center gap-2">
-                    <span className="text-muted-foreground">{isEn ? 'Raw Type:' : '原始类型:'}</span>
+                    <span className="text-muted-foreground">{t('home.rawType')}</span>
                     <span className="font-mono text-[10px]">{activeAccount.subscription.rawType}</span>
                   </div>
                 )}
                 {activeAccount.subscription?.expiresAt && (
                   <div className="flex items-center gap-2">
-                    <span className="text-muted-foreground">{isEn ? 'Expires:' : '到期时间:'}</span>
+                    <span className="text-muted-foreground">{t('home.expires')}</span>
                     <span className="font-medium">{new Date(activeAccount.subscription.expiresAt).toLocaleDateString('zh-CN')}</span>
                   </div>
                 )}
                 {activeAccount.subscription?.upgradeCapability && (
                   <div className="flex items-center gap-2">
-                    <span className="text-muted-foreground">{isEn ? 'Upgradeable:' : '可升级:'}</span>
+                    <span className="text-muted-foreground">{t('home.upgradeable')}</span>
                     <span className="font-medium">{activeAccount.subscription.upgradeCapability}</span>
                   </div>
                 )}
                 {activeAccount.subscription?.overageCapability && (
                   <div className="flex items-center gap-2">
-                    <span className="text-muted-foreground">{isEn ? 'Overage:' : '超额能力:'}</span>
+                    <span className="text-muted-foreground">{t('home.overage')}</span>
                     <span className="font-medium">{activeAccount.subscription.overageCapability}</span>
                   </div>
                 )}
@@ -438,59 +418,56 @@ export function HomePage() {
             {/* 额度明细 */}
             {(activeAccount.usage?.baseLimit || activeAccount.usage?.freeTrialLimit || activeAccount.usage?.bonuses?.length) && (
               <div className="pt-3 border-t space-y-2">
-                <p className="text-xs font-medium text-muted-foreground">{isEn ? 'Quota Details' : '额度明细'}</p>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                  {/* 基础额度 */}
-                  {activeAccount.usage?.baseLimit !== undefined && activeAccount.usage.baseLimit > 0 && (
-                    <div className="flex items-center gap-2 text-xs">
-                      <div className="w-2 h-2 rounded-full bg-blue-500" />
-                      <span className="text-muted-foreground">{isEn ? 'Base:' : '基础额度:'}</span>
-                      <span className="font-medium">
-                        {activeAccount.usage.baseCurrent ?? 0} / {activeAccount.usage.baseLimit}
+              <p className="text-xs font-medium text-muted-foreground">{t('home.quotaDetails')}</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {activeAccount.usage?.baseLimit !== undefined && activeAccount.usage.baseLimit > 0 && (
+                  <div className="flex items-center gap-2 text-xs">
+                    <div className="w-2 h-2 rounded-full bg-blue-500" />
+                    <span className="text-muted-foreground">{t('home.baseQuota')}</span>
+                    <span className="font-medium">
+                      {activeAccount.usage.baseCurrent ?? 0} / {activeAccount.usage.baseLimit}
+                    </span>
+                  </div>
+                )}
+                {activeAccount.usage?.freeTrialLimit !== undefined && activeAccount.usage.freeTrialLimit > 0 && (
+                  <div className="flex items-center gap-2 text-xs">
+                    <div className="w-2 h-2 rounded-full bg-purple-500" />
+                    <span className="text-muted-foreground">{t('home.trialQuota')}</span>
+                    <span className="font-medium">
+                      {activeAccount.usage.freeTrialCurrent ?? 0} / {activeAccount.usage.freeTrialLimit}
+                    </span>
+                    {activeAccount.usage.freeTrialExpiry && (
+                      <span className="text-muted-foreground/70 text-[10px]">
+                        (至 {(() => {
+                          const d = activeAccount.usage.freeTrialExpiry as unknown
+                          try { return (typeof d === 'string' ? d : new Date(d as Date).toISOString()).split('T')[0] } catch { return '' }
+                        })()})
                       </span>
-                    </div>
-                  )}
-                  {/* 试用额度 */}
-                  {activeAccount.usage?.freeTrialLimit !== undefined && activeAccount.usage.freeTrialLimit > 0 && (
-                    <div className="flex items-center gap-2 text-xs">
-                      <div className="w-2 h-2 rounded-full bg-purple-500" />
-                      <span className="text-muted-foreground">{isEn ? 'Trial:' : '试用额度:'}</span>
-                      <span className="font-medium">
-                        {activeAccount.usage.freeTrialCurrent ?? 0} / {activeAccount.usage.freeTrialLimit}
+                    )}
+                  </div>
+                )}
+                {activeAccount.usage?.bonuses?.map((bonus) => (
+                  <div key={bonus.code} className="flex items-center gap-2 text-xs">
+                    <div className="w-2 h-2 rounded-full bg-cyan-500" />
+                    <span className="text-muted-foreground truncate">{bonus.name}:</span>
+                    <span className="font-medium">{bonus.current} / {bonus.limit}</span>
+                    {bonus.expiresAt && (
+                      <span className="text-muted-foreground/70 text-[10px]">
+                        (至 {(() => {
+                          const d = bonus.expiresAt as unknown
+                          try { return (typeof d === 'string' ? d : new Date(d as Date).toISOString()).split('T')[0] } catch { return '' }
+                        })()})
                       </span>
-                      {activeAccount.usage.freeTrialExpiry && (
-                        <span className="text-muted-foreground/70 text-[10px]">
-                          (至 {(() => {
-                            const d = activeAccount.usage.freeTrialExpiry as unknown
-                            try { return (typeof d === 'string' ? d : new Date(d as Date).toISOString()).split('T')[0] } catch { return '' }
-                          })()})
-                        </span>
-                      )}
-                    </div>
-                  )}
-                  {/* 奖励额度 */}
-                  {activeAccount.usage?.bonuses?.map((bonus) => (
-                    <div key={bonus.code} className="flex items-center gap-2 text-xs">
-                      <div className="w-2 h-2 rounded-full bg-cyan-500" />
-                      <span className="text-muted-foreground truncate">{bonus.name}:</span>
-                      <span className="font-medium">{bonus.current} / {bonus.limit}</span>
-                      {bonus.expiresAt && (
-                        <span className="text-muted-foreground/70 text-[10px]">
-                          (至 {(() => {
-                            const d = bonus.expiresAt as unknown
-                            try { return (typeof d === 'string' ? d : new Date(d as Date).toISOString()).split('T')[0] } catch { return '' }
-                          })()})
-                        </span>
-                      )}
-                    </div>
-                  ))}
-                </div>
+                    )}
+                  </div>
+                ))}
               </div>
+            </div>
             )}
 
             {/* 账户信息 */}
             <div className="pt-3 border-t space-y-2">
-              <p className="text-xs font-medium text-muted-foreground">{isEn ? 'Account Info' : '账户信息'}</p>
+              <p className="text-xs font-medium text-muted-foreground">{t('home.accountInfo')}</p>
               <div className="space-y-1.5 text-xs">
                 <div className="flex items-start gap-2">
                   <span className="text-muted-foreground shrink-0">User ID:</span>
@@ -502,11 +479,11 @@ export function HomePage() {
                 </div>
                 {activeAccount.usage?.nextResetDate && (
                   <div className="flex items-center gap-2">
-                    <span className="text-muted-foreground">{isEn ? 'Reset Date:' : '重置日期:'}</span>
+                    <span className="text-muted-foreground">{t('home.resetDate')}</span>
                     <span className="font-medium">
                       {(() => {
                         const d = activeAccount.usage.nextResetDate as unknown
-                        try { return (typeof d === 'string' ? d : new Date(d as Date).toISOString()).split('T')[0] } catch { return isEn ? 'Unknown' : '未知' }
+                        try { return (typeof d === 'string' ? d : new Date(d as Date).toISOString()).split('T')[0] } catch { return t('common.unknown') }
                       })()}
                     </span>
                   </div>
@@ -524,26 +501,26 @@ export function HomePage() {
             <div className="p-2.5 rounded-xl bg-muted">
               <Shield className="h-5 w-5 text-foreground" />
             </div>
-            {isEn ? 'Quick Tips' : '快速提示'}
+            {t('home.quickTips')}
           </CardTitle>
         </CardHeader>
         <CardContent>
           <ul className="space-y-2 text-sm text-muted-foreground">
             <li className="flex items-start gap-2">
               <span className="text-foreground">•</span>
-              {isEn ? 'Click "Accounts" to view and manage all accounts' : '点击左侧「账户管理」可以查看和管理所有账号'}
+              {t('home.tip1')}
             </li>
             <li className="flex items-start gap-2">
               <span className="text-foreground">•</span>
-              {isEn ? 'Click power icon on account card to switch' : '在账号卡片上点击电源图标可以快速切换账号'}
+              {t('home.tip2')}
             </li>
             <li className="flex items-start gap-2">
               <span className="text-foreground">•</span>
-              {isEn ? 'Tokens auto-refresh 5 minutes before expiry' : 'Token 会在过期前 5 分钟自动刷新，无需手动操作'}
+              {t('home.tip3')}
             </li>
             <li className="flex items-start gap-2">
               <span className="text-foreground">•</span>
-              {isEn ? 'Use "Privacy Mode" to hide sensitive info' : '使用「隐私模式」可以隐藏邮箱和账号信息'}
+              {t('home.tip4')}
             </li>
           </ul>
         </CardContent>
@@ -558,10 +535,8 @@ export function HomePage() {
                 <Download className="h-5 w-5 text-foreground" />
               </div>
               <div>
-                <p className="font-semibold text-sm text-foreground">{isEn ? 'Auto Import' : '自动导入'}</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {isEn ? 'Auto-detect and import credentials from cache on startup' : '启动时自动检测并导入缓存中的凭证'}
-                </p>
+                <p className="font-semibold text-sm text-foreground">{t('home.autoImport')}</p>
+                <p className="text-xs text-muted-foreground mt-1">{t('home.autoImportDesc')}</p>
               </div>
             </div>
           </CardContent>
@@ -574,10 +549,8 @@ export function HomePage() {
                 <FolderPlus className="h-5 w-5 text-foreground" />
               </div>
               <div>
-                <p className="font-semibold text-sm text-foreground">{isEn ? 'Groups' : '分组管理'}</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {isEn ? 'Batch set groups for selected accounts' : '多选账户后可批量设置分组，一键移动账号'}
-                </p>
+                <p className="font-semibold text-sm text-foreground">{t('home.groups')}</p>
+                <p className="text-xs text-muted-foreground mt-1">{t('home.groupsDesc')}</p>
               </div>
             </div>
           </CardContent>
@@ -590,10 +563,8 @@ export function HomePage() {
                 <Tag className="h-5 w-5 text-foreground" />
               </div>
               <div>
-                <p className="font-semibold text-sm text-foreground">{isEn ? 'Tags' : '标签管理'}</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {isEn ? 'Batch add/remove tags, multi-tag support' : '多选账户后可批量添加/移除标签，支持多标签'}
-                </p>
+                <p className="font-semibold text-sm text-foreground">{t('home.tags')}</p>
+                <p className="text-xs text-muted-foreground mt-1">{t('home.tagsDesc')}</p>
               </div>
             </div>
           </CardContent>
