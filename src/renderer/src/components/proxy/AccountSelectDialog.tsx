@@ -20,7 +20,7 @@ export function AccountSelectDialog({
   accounts,
   selectedAccountId,
   onSelect,
-  isEn
+  isEn: _isEn
 }: AccountSelectDialogProps) {
   const { t } = useTranslation()
   const [searchQuery, setSearchQuery] = useState('')

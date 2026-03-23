@@ -124,7 +124,7 @@ export function AboutPage() {
             onClick={() => setShowUpdateModal(true)}
           >
             <Download className="h-4 w-4" />
-            {t('about.newVersionBadge', { version: updateInfo.latestVersion })}
+            {t('about.newVersionBadge', { version: updateInfo.latestVersion ?? '' })}
           </div>
         )}
         </div>
@@ -223,7 +223,7 @@ export function AboutPage() {
                     <div>
                       <h3 className="font-semibold text-lg">{t('about.upToDateTitle')}</h3>
                       <p className="text-sm text-muted-foreground">
-                        {t('about.upToDateDesc', { version: updateInfo.currentVersion })}
+                        {t('about.upToDateDesc', { version: updateInfo.currentVersion ?? '' })}
                       </p>
                     </div>
                   </div>

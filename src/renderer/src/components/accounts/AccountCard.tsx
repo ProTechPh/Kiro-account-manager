@@ -192,7 +192,7 @@ export const AccountCard = memo(function AccountCard({
     const result = await window.api.logoutAccount()
     if (result.success) {
       setActiveAccount(null)
-      alert(t('accounts.card.logoutSuccess', { count: result.deletedCount }))
+      alert(t('accounts.card.logoutSuccess', { count: result.deletedCount ?? 0 }))
     } else {
       alert(t('accounts.card.logoutFailed', { error: result.error || '' }))
     }

@@ -874,7 +874,7 @@ export function ProxyPanel() {
           <div className="flex items-center gap-2">
             <span className="text-orange-500 w-11 flex-shrink-0 font-mono">POST</span>
             <code className="text-muted-foreground flex-1 font-mono">/v1/chat/completions</code>
-            <span className="text-xs text-muted-foreground">{t('proxyPanel.openaiCompat')}</span>
+            <span className="text-xs text-muted-foreground">{t('proxyPanel.openaiCompatEndpoint')}</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-orange-500 w-11 flex-shrink-0 font-mono">POST</span>

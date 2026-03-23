@@ -10,7 +10,6 @@ import {
 import { Select } from '@/components/ui'
 import { formatDate } from '@/lib/utils'
 import { cn } from '@/lib/utils'
-import { useAccountsStore } from '@/store/accounts'
 import { ApiKeyUsageDialog } from './ApiKeyUsageDialog'
 
 type ApiKeyFormat = 'sk' | 'simple' | 'token'
