@@ -139,3 +139,83 @@ export function generateToolCallId(): string {
   const uuid = uuidv4().replace(/-/g, '')
   return `call_${uuid.substring(0, 8)}`
 }
+
+/**
+ * Deduplicates tool calls by id (keeping the one with more arguments)
+ * and by name+arguments (removing complete duplicates).
+ * Ported from kiro-gateway/kiro/parsers.py
+ */
+export function deduplicateToolCalls<T extends { id?: string; function?: { name?: string; arguments?: string } }>(toolCalls: T[]): T[] {
+  if (toolCalls.length === 0) return toolCalls
+
+  // Deduplicate by id — keep the one with more arguments
+  const byId = new Map<string, T>()
+  const withoutId: T[] = []
+
+  for (const tc of toolCalls) {
+    const id = tc.id ?? ''
+    if (!id) { withoutId.push(tc); continue }
+    const existing = byId.get(id)
+    if (!existing) { byId.set(id, tc); continue }
+    const existingArgs = existing.function?.arguments ?? '{}'
+    const currentArgs = tc.function?.arguments ?? '{}'
+    if (currentArgs !== '{}' && (existingArgs === '{}' || currentArgs.length > existingArgs.length)) {
+      byId.set(id, tc)
+    }
+  }
+
+  // Deduplicate by name+args
+  const seen = new Set<string>()
+  const unique: T[] = []
+  for (const tc of [...byId.values(), ...withoutId]) {
+    const key = `${tc.function?.name ?? ''}-${tc.function?.arguments ?? '{}'}`
+    if (!seen.has(key)) { seen.add(key); unique.push(tc) }
+  }
+
+  return unique
+}
+
+
+/**
+ * Parses tool calls in [Called func_name with args: {...}] text format.
+ * Some models return tool calls as text instead of structured events.
+ * Ported from kiro-gateway/kiro/parsers.py
+ */
+export function parseBracketToolCalls(text: string): Array<{ id: string; type: 'function'; function: { name: string; arguments: string } }> {
+  if (!text || !text.includes('[Called')) return []
+
+  const results: Array<{ id: string; type: 'function'; function: { name: string; arguments: string } }> = []
+  const pattern = /\[Called\s+(\w+)\s+with\s+args:\s*/gi
+  let match: RegExpExecArray | null
+
+  while ((match = pattern.exec(text)) !== null) {
+    const funcName = match[1]
+    const argsStart = match.index + match[0].length
+    const jsonStart = text.indexOf('{', argsStart)
+    if (jsonStart === -1) continue
+
+    // Find matching closing brace
+    let depth = 0
+    let jsonEnd = -1
+    for (let i = jsonStart; i < text.length; i++) {
+      if (text[i] === '{') depth++
+      else if (text[i] === '}') {
+        depth--
+        if (depth === 0) { jsonEnd = i; break }
+      }
+    }
+    if (jsonEnd === -1) continue
+
+    const jsonStr = text.substring(jsonStart, jsonEnd + 1)
+    try {
+      JSON.parse(jsonStr) // validate
+      results.push({
+        id: generateToolCallId(),
+        type: 'function',
+        function: { name: funcName, arguments: jsonStr }
+      })
+    } catch { /* invalid JSON, skip */ }
+  }
+
+  return results
+}

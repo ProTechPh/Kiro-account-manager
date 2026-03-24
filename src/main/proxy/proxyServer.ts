@@ -12,8 +12,13 @@ import type {
   TokenRefreshCallback
 } from './types'
 import { AccountPool } from './accountPool'
-import { callKiroApiStream, callKiroApi, fetchKiroModels, type KiroModel } from './kiroApi'
+import { callKiroApiStream, callKiroApi, fetchKiroModels, type KiroModel, THINKING_MODE_PROMPT } from './kiroApi'
+import { modelResolver } from './modelResolver'
+import { classifyNetworkError } from './networkErrors'
+import { parseBracketToolCalls } from './gatewayUtils'
+import { getToolTruncation, getContentTruncation, generateTruncationToolResult, TRUNCATION_USER_MESSAGE } from './truncationState'
 import { proxyLogger } from './logger'
+import { ThinkingParser } from './thinkingParser'
 import {
   openaiToKiro,
   claudeToKiro,
@@ -366,6 +371,8 @@ export class ProxyServer {
       const kiroModels = await fetchKiroModels(account)
       if (kiroModels.length > 0) {
         this.modelCache = { models: kiroModels, timestamp: now }
+        // Sync resolver's dynamic cache
+        modelResolver.updateCache(kiroModels)
       }
       return {
         models: kiroModels.map(m => ({
@@ -931,31 +938,46 @@ export class ProxyServer {
     }))
   }
 
-  // Claude Code token 计数（模拟响应）
+  // Claude Code token counting (estimated)
   private async handleCountTokens(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
     try {
       const body = await this.readBody(req)
       const request = JSON.parse(body)
-      // 简单估算 token 数量（每4个字符约1个token）
+
+      // Claude tokenizes ~15% more than GPT-4 (cl100k_base baseline).
+      // GPT-4 baseline: ~4 chars/token → Claude effective: ~3.5 chars/token
+      const CLAUDE_CORRECTION = 1.15
+      const BASE_CHARS_PER_TOKEN = 4
+
+      const countChars = (content: unknown): number => {
+        if (typeof content === 'string') return content.length
+        if (Array.isArray(content)) {
+          return content.reduce((sum: number, part: unknown) => {
+            const p = part as Record<string, unknown>
+            if (p?.type === 'text' && typeof p.text === 'string') return sum + p.text.length
+            if (p?.type === 'tool_result' || p?.type === 'tool_use') return sum + JSON.stringify(p).length
+            return sum
+          }, 0)
+        }
+        return JSON.stringify(content).length
+      }
+
       let totalChars = 0
+
       if (request.messages) {
         for (const msg of request.messages) {
-          if (typeof msg.content === 'string') {
-            totalChars += msg.content.length
-          } else if (Array.isArray(msg.content)) {
-            for (const part of msg.content) {
-              if (part.type === 'text' && part.text) {
-                totalChars += part.text.length
-              }
-            }
-          }
+          totalChars += countChars(msg.content)
         }
       }
       if (request.system) {
-        totalChars += typeof request.system === 'string' ? request.system.length : JSON.stringify(request.system).length
+        totalChars += countChars(request.system)
       }
-      const estimatedTokens = Math.ceil(totalChars / 4)
-      
+      if (request.tools) {
+        totalChars += JSON.stringify(request.tools).length
+      }
+
+      const estimatedTokens = Math.ceil((totalChars / BASE_CHARS_PER_TOKEN) * CLAUDE_CORRECTION)
+
       res.writeHead(200, { 'Content-Type': 'application/json' })
       res.end(JSON.stringify({ input_tokens: estimatedTokens }))
     } catch (error) {
@@ -966,6 +988,12 @@ export class ProxyServer {
   // 模型列表缓存
   private modelCache: { models: KiroModel[]; timestamp: number } | null = null
   private readonly MODEL_CACHE_TTL = 5 * 60 * 1000 // 5 分钟缓存
+
+  /** Returns the model's maxInputTokens from cache, or 200000 as default. */
+  private getModelMaxInputTokens(modelId: string): number {
+    const model = this.modelCache?.models.find(m => m.modelId === modelId)
+    return model?.tokenLimits?.maxInputTokens ?? 200000
+  }
 
   // 模型列表
   private async handleModels(res: http.ServerResponse): Promise<void> {
@@ -985,6 +1013,8 @@ export class ProxyServer {
           kiroModels = await fetchKiroModels(account)
           if (kiroModels.length > 0) {
             this.modelCache = { models: kiroModels, timestamp: now }
+            // Sync resolver's dynamic cache (Layer 2 of 4-layer resolution pipeline)
+            modelResolver.updateCache(kiroModels)
             proxyLogger.info('ProxyServer', `Fetched ${kiroModels.length} models from Kiro API`)
           }
         } catch (error) {
@@ -993,45 +1023,38 @@ export class ProxyServer {
       }
     }
 
-    // 转换 Kiro 模型为 OpenAI 格式（保持原始 modelId）
-    const dynamicModels = kiroModels.map(m => ({
-      id: m.modelId,
-      object: 'model' as const,
-      created: now,
-      owned_by: 'kiro-api',
-      description: m.description,
-      model_name: m.modelName
-    }))
+    // Convert Kiro models to OpenAI format, filtering hidden-from-list entries
+    const dynamicModels = kiroModels
+      .filter(m => !modelResolver.isHiddenFromList(m.modelId))
+      .map(m => ({
+        id: m.modelId,
+        object: 'model' as const,
+        created: now,
+        owned_by: 'kiro-api',
+        description: m.description,
+        model_name: m.modelName
+      }))
 
-    // 预设模型（GPT 兼容别名）- 只有在有动态模型时才添加
+    // GPT-compatible aliases + hidden models + resolver aliases
     const presetModels = dynamicModels.length > 0 ? [
       { id: 'gpt-4o', object: 'model', created: now, owned_by: 'kiro-proxy' },
       { id: 'gpt-4', object: 'model', created: now, owned_by: 'kiro-proxy' },
       { id: 'gpt-4-turbo', object: 'model', created: now, owned_by: 'kiro-proxy' },
-      { id: 'gpt-3.5-turbo', object: 'model', created: now, owned_by: 'kiro-proxy' }
+      { id: 'gpt-3.5-turbo', object: 'model', created: now, owned_by: 'kiro-proxy' },
+      ...modelResolver.getExtraModels(now)
     ] : []
 
-    // 合并模型列表，去重
+    // Merge, deduplicate
     const modelIds = new Set<string>()
     const allModels: Array<{ id: string; object: string; created: number; owned_by: string; description?: string; model_name?: string }> = []
-    
-    // 1. 添加动态模型（从 API 获取的）
+
     for (const m of dynamicModels) {
-      if (!modelIds.has(m.id)) {
-        modelIds.add(m.id)
-        allModels.push(m)
-      }
+      if (!modelIds.has(m.id)) { modelIds.add(m.id); allModels.push(m) }
     }
-    
-    // 2. 添加 GPT 兼容别名（只有在有动态模型时）
     for (const m of presetModels) {
-      if (!modelIds.has(m.id)) {
-        modelIds.add(m.id)
-        allModels.push(m)
-      }
+      if (!modelIds.has(m.id)) { modelIds.add(m.id); allModels.push(m) }
     }
 
-    // 如果没有任何模型，返回空列表
     if (allModels.length === 0) {
       console.warn('[ProxyServer] No models available from Kiro API')
     }
@@ -1075,15 +1098,41 @@ export class ProxyServer {
         ? { ...request, tools: undefined, tool_choice: undefined }
         : request
 
+      // Inject truncation recovery notices if any previous tool calls were truncated
+      const recoveredMessages: typeof processedRequest.messages = []
+      for (const msg of processedRequest.messages) {
+        if (msg.role === 'tool' && msg.tool_call_id) {
+          const truncInfo = getToolTruncation(msg.tool_call_id)
+          if (truncInfo) {
+            const notice = generateTruncationToolResult(truncInfo.toolName, truncInfo.toolCallId)
+            const originalText = typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content)
+            recoveredMessages.push({ ...msg, content: `${notice}\n\n---\n\nOriginal tool result:\n${originalText}` })
+            continue
+          }
+        }
+        if (msg.role === 'assistant' && typeof msg.content === 'string' && msg.content) {
+          const truncInfo = getContentTruncation(msg.content)
+          if (truncInfo) {
+            recoveredMessages.push(msg)
+            recoveredMessages.push({ role: 'user', content: TRUNCATION_USER_MESSAGE })
+            continue
+          }
+        }
+        recoveredMessages.push(msg)
+      }
+      const finalRequest = recoveredMessages.length !== processedRequest.messages.length ||
+        recoveredMessages.some((m, i) => m !== processedRequest.messages[i])
+        ? { ...processedRequest, messages: recoveredMessages }
+        : processedRequest
+
       // 转换为 Kiro 格式
-      let kiroPayload = openaiToKiro(processedRequest, account.profileArn)
+      let kiroPayload = openaiToKiro(finalRequest, account.profileArn)
 
       // 如果启用了 thinking 模式，注入系统提示
       if (thinkingEnabled) {
-        const thinkingPrompt = `<thinking_mode>enabled</thinking_mode>\n<max_thinking_length>200000</max_thinking_length>\n\n`
         const currentMessage = kiroPayload.conversationState?.currentMessage?.userInputMessage
         if (currentMessage && typeof currentMessage.content === 'string') {
-          currentMessage.content = thinkingPrompt + currentMessage.content
+          currentMessage.content = THINKING_MODE_PROMPT + '\n\n' + currentMessage.content
         }
         proxyLogger.info('ProxyServer', 'Thinking mode enabled for request')
       }
@@ -1095,7 +1144,7 @@ export class ProxyServer {
         const toolsCount = userInput?.userInputMessageContext?.tools?.length || 0
         const historyLength = kiroPayload.conversationState.history?.length || 0
         const hasImages = (userInput?.images?.length || 0) > 0
-        
+
         proxyLogger.info('ProxyServer', `OpenAI API: ${request.model}`, {
           model: request.model,
           stream: request.stream,
@@ -1235,10 +1284,17 @@ export class ProxyServer {
               )
               res.write(`data: ${JSON.stringify(toolCallChunk)}\n\n`)
             } else if (text && !isThinking) {
-              // 普通文本内容
+              // Regular text content
               collectedContent += text
               const chunk = createOpenaiStreamChunk(id || uuidv4(), model, { role: 'assistant', content: text })
               res.write(`data: ${JSON.stringify(chunk)}\n\n`)
+            } else if (text && isThinking) {
+              // Thinking content — send as reasoning_content (OpenAI extended thinking format)
+              const thinkingChunk = createOpenaiStreamChunk(id || uuidv4(), model, {
+                role: 'assistant',
+                reasoning_content: text
+              } as any)
+              res.write(`data: ${JSON.stringify(thinkingChunk)}\n\n`)
             }
           },
           async (usage) => {
@@ -1259,6 +1315,20 @@ export class ProxyServer {
             }
 
             const hasToolCalls = pendingToolCalls.size > 0
+
+            // Detect bracket-style tool calls in accumulated text content
+            // (some models return "[Called func with args: {...}]" instead of structured events)
+            const bracketToolCalls = parseBracketToolCalls(collectedContent)
+            if (bracketToolCalls.length > 0 && !hasToolCalls) {
+              proxyLogger.info('ProxyServer', `Detected ${bracketToolCalls.length} bracket-style tool call(s) in content`)
+              const toolCallsChunk = createOpenaiStreamChunk(id || uuidv4(), model, {
+                role: 'assistant',
+                tool_calls: bracketToolCalls.map((tc, idx) => ({ index: idx, ...tc }))
+              } as any)
+              res.write(`data: ${JSON.stringify(toolCallsChunk)}\n\n`)
+            }
+
+            const effectiveHasToolCalls = hasToolCalls || bracketToolCalls.length > 0
             if (hasToolCalls) {
               proxyLogger.info('ProxyServer', 'Single-pass stream mode active', {
                 tools: Array.from(pendingToolCalls.values()).map((tool) => tool.name)
@@ -1266,7 +1336,7 @@ export class ProxyServer {
             }
 
               // 发送结束 chunk（包含完整 usage 信息）
-              const finishReason = hasToolCalls ? 'tool_calls' : 'stop'
+              const finishReason = effectiveHasToolCalls ? 'tool_calls' : 'stop'
               const usageInfo = {
                 prompt_tokens: usage.inputTokens,
                 completion_tokens: usage.outputTokens,
@@ -1345,7 +1415,8 @@ export class ProxyServer {
             resolve()
           },
           abortSignal,
-          this.config.preferredEndpoint
+          this.config.preferredEndpoint,
+          this.getModelMaxInputTokens(model)
         )
       })
     }
@@ -1380,15 +1451,52 @@ export class ProxyServer {
     const startTime = Date.now()
 
     try {
+      // Inject truncation recovery notices for Claude path
+      const claudeMessages: typeof request.messages = []
+      for (const msg of request.messages) {
+        if (msg.role === 'user' && Array.isArray(msg.content)) {
+          // Check for tool_result blocks with truncated tool calls
+          const newContent = msg.content.map((block: any) => {
+            if (block.type === 'tool_result' && block.tool_use_id) {
+              const truncInfo = getToolTruncation(block.tool_use_id)
+              if (truncInfo) {
+                const notice = generateTruncationToolResult(truncInfo.toolName, truncInfo.toolCallId)
+                const originalText = typeof block.content === 'string' ? block.content : JSON.stringify(block.content)
+                return { ...block, content: `${notice}\n\n---\n\nOriginal tool result:\n${originalText}` }
+              }
+            }
+            return block
+          })
+          claudeMessages.push({ ...msg, content: newContent })
+          continue
+        }
+        if (msg.role === 'assistant') {
+          const text = typeof msg.content === 'string' ? msg.content
+            : Array.isArray(msg.content) ? msg.content.filter((b: any) => b.type === 'text').map((b: any) => b.text).join('') : ''
+          if (text) {
+            const truncInfo = getContentTruncation(text)
+            if (truncInfo) {
+              claudeMessages.push(msg)
+              claudeMessages.push({ role: 'user', content: TRUNCATION_USER_MESSAGE })
+              continue
+            }
+          }
+        }
+        claudeMessages.push(msg)
+      }
+      const claudeRequest = claudeMessages.length !== request.messages.length ||
+        claudeMessages.some((m, i) => m !== request.messages[i])
+        ? { ...request, messages: claudeMessages }
+        : request
+
       // 转换为 Kiro 格式
-      let kiroPayload = claudeToKiro(request, account.profileArn)
+      let kiroPayload = claudeToKiro(claudeRequest, account.profileArn)
 
       // 如果启用了 thinking 模式，注入系统提示
       if (thinkingEnabled) {
-        const thinkingPrompt = `<thinking_mode>enabled</thinking_mode>\n<max_thinking_length>200000</max_thinking_length>\n\n`
         const currentMessage = kiroPayload.conversationState?.currentMessage?.userInputMessage
         if (currentMessage && typeof currentMessage.content === 'string') {
-          currentMessage.content = thinkingPrompt + currentMessage.content
+          currentMessage.content = THINKING_MODE_PROMPT + '\n\n' + currentMessage.content
         }
         proxyLogger.info('ProxyServer', 'Thinking mode enabled for Claude request')
       }
@@ -1508,132 +1616,72 @@ export class ProxyServer {
     const id = msgId || `msg_${uuidv4()}`
     let currentBlockIndex = contentBlockIndex
     let hasStartedTextBlock = false
+    let hasStartedThinkingBlock = false
     let collectedContent = ''
     const pendingToolCalls: Map<string, { name: string; input: Record<string, unknown> }> = new Map()
     let hasLoggedThinkingFormat = false
-    // 用于检测普通响应中的 <thinking> 标签
-    let textBuffer = ''
-    let inThinkingBlock = false
 
     // 估算输入 tokens（基于 payload 大小）
-    const estimatedInputTokens = Math.max(1, Math.round(JSON.stringify(kiroPayload).length / 3))
+    const estimatedInputTokens = Math.max(1, Math.round((JSON.stringify(kiroPayload).length / 4) * 1.15))
 
-    // 处理文本输出，检测并转换 <thinking> 标签
+    const format = this.config.thinkingOutputFormat || 'reasoning_content'
+    const thinkingHandlingMode = format === 'reasoning_content' ? 'as_reasoning_content'
+      : format === 'thinking' || format === 'think' ? 'pass'
+      : 'remove'
+    const textParser = new ThinkingParser(thinkingHandlingMode as any)
+
+    // Process regular text through ThinkingParser to detect <thinking>/<think>/<reasoning>/<thought> tags
     const processClaudeText = (text: string, forceFlush = false) => {
-      const format = this.config.thinkingOutputFormat || 'reasoning_content'
-      textBuffer += text
-      
-      while (true) {
-        if (!inThinkingBlock) {
-          // 查找 <thinking> 开始标签
-          const thinkingStart = textBuffer.indexOf('<thinking>')
-          if (thinkingStart !== -1) {
-            // 输出 thinking 标签之前的内容
-            if (thinkingStart > 0) {
-              const beforeThinking = textBuffer.substring(0, thinkingStart)
-              collectedContent += beforeThinking
-              if (!hasStartedTextBlock) {
-                const blockStart = createClaudeStreamEvent('content_block_start', {
-                  index: currentBlockIndex,
-                  content_block: { type: 'text', text: '' }
-                })
-                res.write(`event: content_block_start\ndata: ${JSON.stringify(blockStart)}\n\n`)
-                hasStartedTextBlock = true
-              }
-              const delta = createClaudeStreamEvent('content_block_delta', {
-                index: currentBlockIndex,
-                delta: { type: 'text_delta', text: beforeThinking }
-              })
-              res.write(`event: content_block_delta\ndata: ${JSON.stringify(delta)}\n\n`)
-            }
-            textBuffer = textBuffer.substring(thinkingStart + 10) // 移除 <thinking>
-            inThinkingBlock = true
-            if (!hasLoggedThinkingFormat) {
-              proxyLogger.info('ProxyServer', `[Claude] Detected <thinking> tag, output format: ${format}`)
-              hasLoggedThinkingFormat = true
-            }
-          } else if (forceFlush || textBuffer.length > 50) {
-            // 没有找到标签，安全输出
-            const safeLength = forceFlush ? textBuffer.length : Math.max(0, textBuffer.length - 15)
-            if (safeLength > 0) {
-              const safeText = textBuffer.substring(0, safeLength)
-              collectedContent += safeText
-              if (!hasStartedTextBlock) {
-                const blockStart = createClaudeStreamEvent('content_block_start', {
-                  index: currentBlockIndex,
-                  content_block: { type: 'text', text: '' }
-                })
-                res.write(`event: content_block_start\ndata: ${JSON.stringify(blockStart)}\n\n`)
-                hasStartedTextBlock = true
-              }
-              const delta = createClaudeStreamEvent('content_block_delta', {
-                index: currentBlockIndex,
-                delta: { type: 'text_delta', text: safeText }
-              })
-              res.write(`event: content_block_delta\ndata: ${JSON.stringify(delta)}\n\n`)
-              textBuffer = textBuffer.substring(safeLength)
-            }
-            break
-          } else {
-            break
-          }
-        } else {
-          // 在 thinking 块内，查找 </thinking> 结束标签
-          const thinkingEnd = textBuffer.indexOf('</thinking>')
-          if (thinkingEnd !== -1) {
-            // 输出 thinking 内容
-            const thinkingContent = textBuffer.substring(0, thinkingEnd)
-            if (thinkingContent) {
-              if (!hasStartedTextBlock) {
-                const blockStart = createClaudeStreamEvent('content_block_start', {
-                  index: currentBlockIndex,
-                  content_block: { type: 'text', text: '' }
-                })
-                res.write(`event: content_block_start\ndata: ${JSON.stringify(blockStart)}\n\n`)
-                hasStartedTextBlock = true
-              }
-              if (format === 'thinking') {
-                const delta = createClaudeStreamEvent('content_block_delta', {
-                  index: currentBlockIndex,
-                  delta: { type: 'text_delta', text: `<thinking>${thinkingContent}</thinking>` }
-                })
-                res.write(`event: content_block_delta\ndata: ${JSON.stringify(delta)}\n\n`)
-              } else if (format === 'think') {
-                const delta = createClaudeStreamEvent('content_block_delta', {
-                  index: currentBlockIndex,
-                  delta: { type: 'text_delta', text: `<think>${thinkingContent}</think>` }
-                })
-                res.write(`event: content_block_delta\ndata: ${JSON.stringify(delta)}\n\n`)
-              }
-              // reasoning_content 格式：过滤掉 thinking 内容（大多数客户端不支持此字段）
-            }
-            textBuffer = textBuffer.substring(thinkingEnd + 11) // 移除 </thinking>
-            inThinkingBlock = false
-          } else if (forceFlush && textBuffer) {
-            // 强制刷新：输出剩余内容
-            if (format === 'thinking' || format === 'think') {
-              if (!hasStartedTextBlock) {
-                const blockStart = createClaudeStreamEvent('content_block_start', {
-                  index: currentBlockIndex,
-                  content_block: { type: 'text', text: '' }
-                })
-                res.write(`event: content_block_start\ndata: ${JSON.stringify(blockStart)}\n\n`)
-                hasStartedTextBlock = true
-              }
-              const tag = format === 'thinking' ? 'thinking' : 'think'
-              const delta = createClaudeStreamEvent('content_block_delta', {
-                index: currentBlockIndex,
-                delta: { type: 'text_delta', text: `<${tag}>${textBuffer}</${tag}>` }
-              })
-              res.write(`event: content_block_delta\ndata: ${JSON.stringify(delta)}\n\n`)
-            }
-            // reasoning_content 格式：过滤掉 thinking 内容
-            textBuffer = ''
-            break
-          } else {
-            break
-          }
+      const result = forceFlush ? textParser.finalize() : textParser.feed(text)
+
+      if (result.regularContent) {
+        collectedContent += result.regularContent
+        if (!hasStartedTextBlock) {
+          res.write(`event: content_block_start\ndata: ${JSON.stringify(createClaudeStreamEvent('content_block_start', {
+            index: currentBlockIndex, content_block: { type: 'text', text: '' }
+          }))}\n\n`)
+          hasStartedTextBlock = true
         }
+        res.write(`event: content_block_delta\ndata: ${JSON.stringify(createClaudeStreamEvent('content_block_delta', {
+          index: currentBlockIndex, delta: { type: 'text_delta', text: result.regularContent }
+        }))}\n\n`)
+      }
+
+      if (result.thinkingContent) {
+        if (!hasLoggedThinkingFormat) {
+          proxyLogger.info('ProxyServer', `[Claude] Detected thinking tag in text, output format: ${format}`)
+          hasLoggedThinkingFormat = true
+        }
+        if (format === 'reasoning_content') {
+          // Send as proper Anthropic thinking block
+          if (!hasStartedThinkingBlock) {
+            const sig = `sig_${uuidv4().replace(/-/g, '').substring(0, 32)}`
+            res.write(`event: content_block_start\ndata: ${JSON.stringify(createClaudeStreamEvent('content_block_start', {
+              index: currentBlockIndex, content_block: { type: 'thinking', thinking: '', signature: sig }
+            }))}\n\n`)
+            hasStartedThinkingBlock = true
+          }
+          res.write(`event: content_block_delta\ndata: ${JSON.stringify(createClaudeStreamEvent('content_block_delta', {
+            index: currentBlockIndex, delta: { type: 'thinking_delta', thinking: result.thinkingContent }
+          }))}\n\n`)
+          if (result.isLastThinkingChunk) {
+            res.write(`event: content_block_stop\ndata: ${JSON.stringify(createClaudeStreamEvent('content_block_stop', { index: currentBlockIndex }))}\n\n`)
+            currentBlockIndex++
+            hasStartedThinkingBlock = false
+          }
+        } else if (format === 'thinking' || format === 'think') {
+          if (!hasStartedTextBlock) {
+            res.write(`event: content_block_start\ndata: ${JSON.stringify(createClaudeStreamEvent('content_block_start', {
+              index: currentBlockIndex, content_block: { type: 'text', text: '' }
+            }))}\n\n`)
+            hasStartedTextBlock = true
+          }
+          const tag = format
+          res.write(`event: content_block_delta\ndata: ${JSON.stringify(createClaudeStreamEvent('content_block_delta', {
+            index: currentBlockIndex, delta: { type: 'text_delta', text: `<${tag}>${result.thinkingContent}</${tag}>` }
+          }))}\n\n`)
+        }
+        // else: filter — don't send thinking content
       }
     }
     
@@ -1663,14 +1711,30 @@ export class ProxyServer {
 
           if (text) {
             if (isThinking) {
-              // reasoningContentEvent 的思考内容
               const format = this.config.thinkingOutputFormat || 'reasoning_content'
               if (!hasLoggedThinkingFormat) {
-                proxyLogger.info('ProxyServer', `[Claude] Thinking output format (reasoningContentEvent): ${format}`)
+                proxyLogger.info('ProxyServer', `[Claude] Thinking output format: ${format}`)
                 hasLoggedThinkingFormat = true
               }
-              // reasoning_content 格式：过滤掉思考内容（大多数客户端不支持）
-              if (format === 'thinking' || format === 'think') {
+
+              if (format === 'reasoning_content') {
+                // Proper Anthropic extended thinking block
+                if (!hasStartedThinkingBlock) {
+                  // Generate a placeholder signature (Anthropic requires this field)
+                  const thinkingSig = `sig_${uuidv4().replace(/-/g, '').substring(0, 32)}`
+                  const thinkingBlockStart = createClaudeStreamEvent('content_block_start', {
+                    index: currentBlockIndex,
+                    content_block: { type: 'thinking', thinking: '', signature: thinkingSig }
+                  })
+                  res.write(`event: content_block_start\ndata: ${JSON.stringify(thinkingBlockStart)}\n\n`)
+                  hasStartedThinkingBlock = true
+                }
+                const thinkingDelta = createClaudeStreamEvent('content_block_delta', {
+                  index: currentBlockIndex,
+                  delta: { type: 'thinking_delta', thinking: text }
+                })
+                res.write(`event: content_block_delta\ndata: ${JSON.stringify(thinkingDelta)}\n\n`)
+              } else if (format === 'thinking' || format === 'think') {
                 if (!hasStartedTextBlock) {
                   const blockStart = createClaudeStreamEvent('content_block_start', {
                     index: currentBlockIndex,
@@ -1686,13 +1750,20 @@ export class ProxyServer {
                 })
                 res.write(`event: content_block_delta\ndata: ${JSON.stringify(delta)}\n\n`)
               }
+              // else: filter out thinking content
             } else {
               // 普通文本，检测 <thinking> 标签
               processClaudeText(text)
             }
           }
           if (toolUse) {
-            // 结束之前的文本块
+            // Close any open thinking or text block first
+            if (hasStartedThinkingBlock) {
+              const thinkingStop = createClaudeStreamEvent('content_block_stop', { index: currentBlockIndex })
+              res.write(`event: content_block_stop\ndata: ${JSON.stringify(thinkingStop)}\n\n`)
+              currentBlockIndex++
+              hasStartedThinkingBlock = false
+            }
             if (hasStartedTextBlock) {
               const blockStop = createClaudeStreamEvent('content_block_stop', { index: currentBlockIndex })
               res.write(`event: content_block_stop\ndata: ${JSON.stringify(blockStop)}\n\n`)
@@ -1727,7 +1798,14 @@ export class ProxyServer {
 
           // 刷新缓冲区中剩余的内容
           processClaudeText('', true)
-          
+
+          // Close any open thinking block
+          if (hasStartedThinkingBlock) {
+            const thinkingStop = createClaudeStreamEvent('content_block_stop', { index: currentBlockIndex })
+            res.write(`event: content_block_stop\ndata: ${JSON.stringify(thinkingStop)}\n\n`)
+            currentBlockIndex++
+          }
+
           // 结束最后的文本块
           if (hasStartedTextBlock) {
             const blockStop = createClaudeStreamEvent('content_block_stop', { index: currentBlockIndex })
@@ -1794,7 +1872,9 @@ export class ProxyServer {
           this.recordRequest({ path: '/v1/messages', model, accountId: account.id, responseTime: Date.now() - startTime, success: false, error: responseMessage })
           resolve()
         },
-        abortSignal
+        abortSignal,
+        undefined,
+        this.getModelMaxInputTokens(model)
       )
     })
   }
@@ -1804,15 +1884,30 @@ export class ProxyServer {
     this.recordRequestFailed()
     const isQuotaError = this.isHighVolumeError(error.message)
     const isAuthError = error.message.includes('401') || error.message.includes('403') || error.message.includes('Auth')
-    const responseMessage = isQuotaError
-      ? 'try to change model just because high volume'
-      : error.message
 
     this.accountPool.recordError(account.id, isQuotaError)
 
     let statusCode = 500
-    if (isQuotaError) statusCode = 429
-    if (isAuthError) statusCode = 401
+    let responseMessage = error.message
+
+    if (isQuotaError) {
+      statusCode = 429
+      responseMessage = 'try to change model just because high volume'
+    } else if (isAuthError) {
+      statusCode = 401
+    } else {
+      // Classify network errors for better user-facing messages
+      const netInfo = classifyNetworkError(error)
+      const isNetworkError = netInfo.category !== 'unknown' ||
+        error.message.includes('ENOTFOUND') ||
+        error.message.includes('ECONNRESET') ||
+        error.message.includes('ETIMEDOUT') ||
+        error.message.includes('ECONNREFUSED')
+      if (isNetworkError) {
+        statusCode = netInfo.suggestedHttpCode
+        responseMessage = `${netInfo.userMessage} (${netInfo.troubleshootingSteps[0]})`
+      }
+    }
 
     this.sendError(res, statusCode, responseMessage)
     this.events.onResponse?.({ path, status: statusCode, error: responseMessage })

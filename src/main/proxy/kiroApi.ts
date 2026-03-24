@@ -1,7 +1,8 @@
 // Kiro API 调用核心模块
 import { v4 as uuidv4 } from 'uuid'
 import { getKiroUserAgent, getKiroAmzUserAgent } from '../fingerprint'
-import { getMachineFingerprint } from './gatewayUtils'
+import { getMachineFingerprint, parseBracketToolCalls, deduplicateToolCalls } from './gatewayUtils'
+import { modelResolver } from './modelResolver'
 import type {
   KiroPayload,
   KiroUserInputMessage,
@@ -13,6 +14,7 @@ import type {
   ProxyAccount
 } from './types'
 import { proxyLogger } from './logger'
+import { saveToolTruncation, saveContentTruncation } from './truncationState'
 
 // Kiro API 端点配置
 const KIRO_ENDPOINTS = [
@@ -63,50 +65,39 @@ You MUST follow these rules for ALL file operations. Violation causes server tim
 REMEMBER: When in doubt, write LESS per operation. Multiple small operations > one large operation.`
 
 // Thinking 模式标签
-const THINKING_MODE_PROMPT = `<thinking_mode>enabled</thinking_mode>
-<max_thinking_length>200000</max_thinking_length>`
+export const THINKING_MODE_PROMPT = `<thinking_mode>enabled</thinking_mode>
+<max_thinking_length>200000</max_thinking_length>
+<thinking_instruction>Think in English for better reasoning quality.
 
-// 模型 ID 映射
-const MODEL_ID_MAP: Record<string, string> = {
-  // GPT 兼容映射 (映射到 Claude models)
+Your thinking process should be thorough and systematic:
+- First, make sure you fully understand what is being asked
+- Consider multiple approaches or perspectives when relevant
+- Think about edge cases, potential issues, and what could go wrong
+- Challenge your initial assumptions
+- Verify your reasoning before reaching a conclusion
+
+After completing your thinking, respond in the same language the user is using in their messages, or in the language specified in their settings if available.
+
+Take the time you need. Quality of thought matters more than speed.</thinking_instruction>`
+
+// GPT alias → Claude model (kept for backward compatibility)
+const GPT_ALIASES: Record<string, string> = {
   'gpt-4': 'claude-sonnet-4.5',
   'gpt-4o': 'claude-sonnet-4.5',
   'gpt-4-turbo': 'claude-sonnet-4.5',
   'gpt-3.5-turbo': 'claude-sonnet-4.5',
-  // Claude 3.x 系列映射到 4.x (for backward compatibility)
-  'claude-3-5-sonnet': 'claude-sonnet-4.5',
-  'claude-3-opus': 'claude-sonnet-4.5',
-  'claude-3-sonnet': 'claude-sonnet-4',
-  'claude-3-haiku': 'claude-haiku-4.5',
-  'default': 'auto'
 }
 
 export function mapModelId(model: string): string {
-  // First, check if the model should be used as-is (no mapping needed)
-  // These are models that are directly supported by Kiro API
-  const directModels = [
-    'auto',
-    'claude-sonnet-4.5',
-    'claude-sonnet-4',
-    'claude-haiku-4.5',
-    'claude-opus-4.5',
-    'deepseek-3.2',
-    'minimax-m2.1',
-    'qwen3-coder-next'
-  ]
-  
-  if (directModels.includes(model)) {
-    return model
-  }
-  
-  // For models that need mapping (like GPT aliases)
+  // 1. GPT aliases
   const lower = model.toLowerCase()
-  for (const [key, value] of Object.entries(MODEL_ID_MAP)) {
-    if (lower.includes(key)) {
-      return value
-    }
+  for (const [key, value] of Object.entries(GPT_ALIASES)) {
+    if (lower.includes(key)) return value
   }
-  return MODEL_ID_MAP.default
+
+  // 2. Resolve via modelResolver (aliases → normalize → hidden models → passthrough)
+  const resolution = modelResolver.resolve(model)
+  return resolution.internalId
 }
 
 // 检测是否为 Agentic 模式请求
@@ -484,6 +475,30 @@ function getSortedEndpoints(preferredEndpoint?: 'codewhisperer' | 'amazonq'): ty
   return sorted
 }
 
+// First-token timeout: if model doesn't start responding within this time, retry
+const FIRST_TOKEN_TIMEOUT_MS = 15000 // 15s (matches kiro-gateway default)
+const FIRST_TOKEN_MAX_RETRIES = 3
+
+/**
+ * Enhances Kiro API error JSON with user-friendly messages.
+ * Ported from kiro-gateway/kiro/kiro_errors.py
+ */
+function enhanceKiroError(errorJson: Record<string, unknown>, status: number): string {
+  const original = (errorJson.message as string) || 'Unknown error'
+  const reason = (errorJson.reason as string) || 'UNKNOWN'
+
+  if (reason === 'CONTENT_LENGTH_EXCEEDS_THRESHOLD') {
+    return 'Model context limit reached. Conversation size exceeds model capacity.'
+  }
+  if (reason === 'MONTHLY_REQUEST_COUNT') {
+    return 'Monthly request limit exceeded. Account has reached its monthly quota.'
+  }
+  if (status === 429) {
+    return `Rate limit exceeded: ${original}`
+  }
+  return reason !== 'UNKNOWN' ? `${original} (reason: ${reason})` : `API error ${status}: ${original}`
+}
+
 // 调用 Kiro API（流式）
 export async function callKiroApiStream(
   account: ProxyAccount,
@@ -492,76 +507,124 @@ export async function callKiroApiStream(
   onComplete: (usage: { inputTokens: number; outputTokens: number; credits: number; cacheReadTokens?: number; cacheWriteTokens?: number; reasoningTokens?: number }) => void,
   onError: (error: Error) => void,
   signal?: AbortSignal,
-  preferredEndpoint?: 'codewhisperer' | 'amazonq'
+  preferredEndpoint?: 'codewhisperer' | 'amazonq',
+  maxInputTokens: number = 200000
 ): Promise<void> {
   const endpoints = getSortedEndpoints(preferredEndpoint)
   let lastError: Error | null = null
 
-  for (const endpoint of endpoints) {
+  // Build a flat list of attempts: each endpoint repeated up to FIRST_TOKEN_MAX_RETRIES times
+  // We iterate until success, auth error, or all attempts exhausted
+  const attempts: typeof endpoints = []
+  for (let i = 0; i < FIRST_TOKEN_MAX_RETRIES; i++) {
+    attempts.push(...endpoints)
+  }
+
+  for (const endpoint of attempts) {
+    if (signal?.aborted) break
+
     try {
-      // 更新 payload 中的 origin
       if (payload.conversationState.currentMessage.userInputMessage) {
         payload.conversationState.currentMessage.userInputMessage.origin = endpoint.origin
       }
 
-      // 调试：打印请求体摘要
       const payloadStr = JSON.stringify(payload)
       console.log(`[KiroAPI] Request to ${endpoint.name}:`)
       console.log(`[KiroAPI]   - Content length: ${payload.conversationState.currentMessage.userInputMessage?.content?.length || 0}`)
       console.log(`[KiroAPI]   - Tools count: ${payload.conversationState.currentMessage.userInputMessage?.userInputMessageContext?.tools?.length || 0}`)
       console.log(`[KiroAPI]   - Payload size: ${payloadStr.length} bytes`)
-      
+
       const headers = getAuthHeaders(account, endpoint)
-      // 流式请求直接发送，添加30秒超时
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 30000) // 30秒超时
-      
-      const combinedSignal = signal ? 
-        AbortSignal.any([signal, controller.signal]) : 
-        controller.signal
-      
+
+      // Total request timeout (30s)
+      const totalController = new AbortController()
+      const totalTimeoutId = setTimeout(() => totalController.abort(), 30000)
+
+      // First-token timeout (15s) — aborts if model doesn't start responding
+      const firstTokenController = new AbortController()
+      let firstTokenReceived = false
+      const firstTokenTimeoutId = setTimeout(() => {
+        if (!firstTokenReceived) {
+          console.log(`[KiroAPI] First-token timeout on ${endpoint.name}, retrying...`)
+          firstTokenController.abort()
+        }
+      }, FIRST_TOKEN_TIMEOUT_MS)
+
+      const signals = [totalController.signal, firstTokenController.signal]
+      if (signal) signals.push(signal)
+      const combinedSignal = AbortSignal.any(signals)
+
       const response = await fetch(endpoint.url, {
         method: 'POST',
         headers,
-        body: JSON.stringify(payload),
+        body: payloadStr,
         signal: combinedSignal
       })
-      
-      clearTimeout(timeoutId)
+
+      clearTimeout(totalTimeoutId)
 
       if (response.status === 429) {
-        console.log(`[KiroAPI] Endpoint ${endpoint.name} quota exhausted, trying next...`)
+        clearTimeout(firstTokenTimeoutId)
+        // Exponential backoff for rate limiting (1s, 2s, 4s...)
+        const attemptIndex = attempts.indexOf(endpoint)
+        const delay = Math.min(1000 * Math.pow(2, attemptIndex % endpoints.length), 8000)
+        console.log(`[KiroAPI] Endpoint ${endpoint.name} quota exhausted, waiting ${delay}ms...`)
+        await new Promise(r => setTimeout(r, delay))
         lastError = new Error(`Quota exhausted on ${endpoint.name}`)
         continue
       }
 
+      if (response.status >= 500) {
+        clearTimeout(firstTokenTimeoutId)
+        const body = await response.text()
+        const attemptIndex = attempts.indexOf(endpoint)
+        const delay = Math.min(1000 * Math.pow(2, attemptIndex % endpoints.length), 8000)
+        console.log(`[KiroAPI] Server error ${response.status} on ${endpoint.name}, waiting ${delay}ms...`)
+        await new Promise(r => setTimeout(r, delay))
+        lastError = new Error(`Server error ${response.status}: ${body.substring(0, 200)}`)
+        continue
+      }
+
       if (response.status === 401 || response.status === 403) {
+        clearTimeout(firstTokenTimeoutId)
         const body = await response.text()
         throw new Error(`Auth error ${response.status}: ${body}`)
       }
 
       if (!response.ok) {
+        clearTimeout(firstTokenTimeoutId)
         const body = await response.text()
-        throw new Error(`API error ${response.status}: ${body}`)
+        let errorMsg = `API error ${response.status}: ${body}`
+        try {
+          const errJson = JSON.parse(body)
+          errorMsg = enhanceKiroError(errJson, response.status)
+        } catch { /* not JSON, use raw body */ }
+        throw new Error(errorMsg)
       }
 
-      // 解析 Event Stream
-      // 计算输入字符长度用于估算 input tokens
+      // Wrap onChunk to detect first token and clear the first-token timer
+      const wrappedOnChunk = (text: string, toolUse?: KiroToolUse, isThinking?: boolean) => {
+        if (!firstTokenReceived) {
+          firstTokenReceived = true
+          clearTimeout(firstTokenTimeoutId)
+        }
+        onChunk(text, toolUse, isThinking)
+      }
+
       const inputChars = payloadStr.length
-      await parseEventStream(response.body!, onChunk, onComplete, onError, inputChars)
+      await parseEventStream(response.body!, wrappedOnChunk, onComplete, onError, inputChars, maxInputTokens)
+      clearTimeout(firstTokenTimeoutId)
       return
     } catch (error) {
       lastError = error as Error
       console.error(`[KiroAPI] Endpoint ${endpoint.name} failed:`, error)
-      
-      // 如果是超时错误，记录并继续尝试下一个端点
+
       if ((error as Error).name === 'AbortError') {
         console.log(`[KiroAPI] Endpoint ${endpoint.name} timed out, trying next...`)
         lastError = new Error(`Request timeout on ${endpoint.name}`)
         continue
       }
-      
-      // 如果是认证错误，不继续尝试其他端点
+
       if ((error as Error).message.includes('Auth error')) {
         throw error
       }
@@ -644,6 +707,11 @@ function finalizeToolUseState(
       _error: 'Tool input truncated or malformed in Kiro stream',
       _partialInput: state.inputBuffer?.substring(0, 500) || ''
     }
+    // Save truncation info for recovery on next request
+    saveToolTruncation(state.toolUseId, state.name, {
+      sizeBytes: state.inputBuffer?.length ?? 0,
+      reason: String(e)
+    })
   }
 
   onChunk('', {
@@ -663,7 +731,8 @@ async function parseEventStream(
   onChunk: (text: string, toolUse?: KiroToolUse, isThinking?: boolean) => void,
   onComplete: (usage: { inputTokens: number; outputTokens: number; credits: number; cacheReadTokens?: number; cacheWriteTokens?: number; reasoningTokens?: number }) => void,
   onError: (error: Error) => void,
-  inputChars: number = 0  // 输入字符长度，用于估算 input tokens
+  inputChars: number = 0,
+  maxInputTokens: number = 200000  // Model's max input tokens for contextUsage calculation
 ): Promise<void> {
   const reader = body.getReader()
   let buffer = new Uint8Array(0)
@@ -678,11 +747,12 @@ async function parseEventStream(
   
   // 累积输出文本长度，用于估算 tokens
   let totalOutputChars = 0
+  let accumulatedContent = ''  // For content truncation detection
+  let receivedCompletionSignal = false  // True if usage/metering event received
   
-  // 估算 input tokens（基于输入字符长度）
-  // 约 3 个字符 = 1 token（混合中英文场景的保守估计）
+  // Estimate input tokens from payload size using Claude correction factor (1.15x)
   if (inputChars > 0) {
-    usage.inputTokens = Math.max(1, Math.round(inputChars / 3))
+    usage.inputTokens = Math.max(1, Math.round((inputChars / 4) * 1.15))
   }
   
   // Tool use 状态跟踪 - 按 toolUseId 处理，避免片段流/重复 stop 导致逻辑异常
@@ -743,8 +813,8 @@ async function parseEventStream(
               const content = assistantResp.content
               if (content) {
                 onChunk(content)
-                // 累积输出字符长度
                 totalOutputChars += content.length
+                accumulatedContent += content
               }
             }
             
@@ -870,15 +940,16 @@ async function parseEventStream(
               const usageData = event.usageEvent || event.usage || event
               if (usageData.inputTokens) usage.inputTokens = usageData.inputTokens
               if (usageData.outputTokens) usage.outputTokens = usageData.outputTokens
+              receivedCompletionSignal = true
             }
-            
+
             // 处理 meteringEvent - Kiro API 返回 credit 使用量
             if (eventType === 'meteringEvent' || event.meteringEvent) {
               const metering = event.meteringEvent || event
               if (metering.usage && typeof metering.usage === 'number') {
-                // 累加 credit 使用量
                 usage.credits += metering.usage
                 proxyLogger.info('Kiro', `meteringEvent - credit: ${metering.usage}, total: ${usage.credits}`)
+                receivedCompletionSignal = true
               }
             }
             
@@ -906,9 +977,19 @@ async function parseEventStream(
               if (contextEvent.contextUsagePercentage !== undefined) {
                 const percentage = contextEvent.contextUsagePercentage
                 proxyLogger.info('Kiro', 'contextUsageEvent - Context usage: ' + percentage.toFixed(2) + '%')
-                // 如果上下文使用率超过 80%，发送警告
                 if (percentage > 80) {
                   console.warn('[Kiro] Warning: Context usage is high:', percentage.toFixed(2) + '%')
+                }
+                // Use contextUsagePercentage to derive input tokens when direct counts aren't available.
+                // Most Claude models have 200k max input tokens.
+                // Formula (from kiro-gateway): total = (pct/100) * maxInput; input = total - output
+                if (usage.inputTokens === 0 || usage.inputTokens === Math.max(1, Math.round(inputChars / 3))) {
+                  const totalTokens = Math.round((percentage / 100) * maxInputTokens)
+                  const derivedInput = Math.max(0, totalTokens - usage.outputTokens)
+                  if (derivedInput > 0) {
+                    usage.inputTokens = derivedInput
+                    proxyLogger.info('Kiro', `Token count from contextUsage: input=${derivedInput}, total=${totalTokens}`)
+                  }
                 }
               }
             }
@@ -1034,11 +1115,16 @@ async function parseEventStream(
       }
     }
     
-    // 如果 API 没有返回 token 信息，基于输出字符长度估算
-    // Token 估算规则：约 4 个字符 = 1 token（对于英文），中文约 2 字符 = 1 token
-    // 这里使用保守估计：平均 3 个字符 = 1 token
+    // If stream ended without a completion signal, content may have been truncated
+    if (!receivedCompletionSignal && accumulatedContent.length > 0) {
+      proxyLogger.info('Kiro', `Stream ended without completion signal — possible content truncation (${accumulatedContent.length} chars)`)
+      saveContentTruncation(accumulatedContent)
+    }
+
+    // If API didn't return token info, estimate from output chars.
+    // Use same Claude correction factor (1.15x) as input token counting.
     if (usage.outputTokens === 0 && totalOutputChars > 0) {
-      usage.outputTokens = Math.max(1, Math.round(totalOutputChars / 3))
+      usage.outputTokens = Math.max(1, Math.round((totalOutputChars / 4) * 1.15))
       proxyLogger.info('Kiro', `Estimated output tokens: ${totalOutputChars} chars -> ${usage.outputTokens} tokens`)
     }
     
@@ -1071,13 +1157,32 @@ export async function callKiroApi(
       payload,
       (text, toolUse) => {
         content += text
-        if (toolUse) {
-          toolUses.push(toolUse)
-        }
+        if (toolUse) toolUses.push(toolUse)
       },
       (u) => {
         usage = u
-        resolve({ content, toolUses, usage })
+        // Detect bracket-style tool calls in accumulated content
+        const bracketTools = parseBracketToolCalls(content)
+        if (bracketTools.length > 0 && toolUses.length === 0) {
+          for (const tc of bracketTools) {
+            toolUses.push({
+              toolUseId: tc.id,
+              name: tc.function.name,
+              input: (() => { try { return JSON.parse(tc.function.arguments) } catch { return {} } })()
+            })
+          }
+        }
+        // Deduplicate tool uses by id and name+args
+        const deduped = deduplicateToolCalls(toolUses.map(tu => ({
+          id: tu.toolUseId,
+          function: { name: tu.name, arguments: JSON.stringify(tu.input) }
+        })))
+        const dedupedToolUses = deduped.map(tc => ({
+          toolUseId: tc.id ?? '',
+          name: tc.function?.name ?? '',
+          input: (() => { try { return JSON.parse(tc.function?.arguments ?? '{}') } catch { return {} } })()
+        }))
+        resolve({ content, toolUses: dedupedToolUses, usage })
       },
       reject,
       signal

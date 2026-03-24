@@ -1,19 +1,19 @@
 // Thinking Block Parser for Streaming Responses
 // Parses <thinking>, <think>, <reasoning> tags from AI responses
-// Based on kiro-gateway implementation
+// Ported from kiro-gateway/kiro/thinking_parser.py
 
 export enum ParserState {
-  PRE_CONTENT = 0,    // Initial state, buffering to detect opening tag
-  IN_THINKING = 1,    // Inside thinking block, buffering until closing tag
-  STREAMING = 2       // Regular streaming, no more thinking block detection
+  PRE_CONTENT = 0,  // Initial state, buffering to detect opening tag
+  IN_THINKING = 1,  // Inside thinking block, buffering until closing tag
+  STREAMING = 2     // Regular streaming, no more thinking block detection
 }
 
 export interface ThinkingParseResult {
-  thinkingContent: string | null      // Content to be sent as reasoning
-  regularContent: string | null       // Regular content to be sent as delta
-  isFirstThinkingChunk: boolean       // True if this is the first chunk of thinking
-  isLastThinkingChunk: boolean        // True if thinking block just closed
-  stateChanged: boolean               // True if parser state changed
+  thinkingContent: string | null    // Content to be sent as reasoning_content
+  regularContent: string | null     // Regular content to be sent as delta.content
+  isFirstThinkingChunk: boolean     // True if this is the first chunk of thinking
+  isLastThinkingChunk: boolean      // True if thinking block just closed
+  stateChanged: boolean             // True if parser state changed during this feed
 }
 
 export type ThinkingHandlingMode = 'as_reasoning_content' | 'remove' | 'pass' | 'strip_tags'
@@ -23,7 +23,7 @@ export class ThinkingParser {
   private openTags: string[]
   private initialBufferSize: number
   private maxTagLength: number
-  
+
   private state: ParserState
   private initialBuffer: string
   private thinkingBuffer: string
@@ -34,16 +34,17 @@ export class ThinkingParser {
 
   constructor(
     handlingMode: ThinkingHandlingMode = 'as_reasoning_content',
-    openTags: string[] = ['<thinking>', '<think>', '<reasoning>'],
+    openTags: string[] = ['<thinking>', '<think>', '<reasoning>', '<thought>'],
     initialBufferSize: number = 100
   ) {
     this.handlingMode = handlingMode
     this.openTags = openTags
     this.initialBufferSize = initialBufferSize
-    
+
     // Calculate max tag length for cautious buffering
+    // We need to buffer enough to not split a closing tag across chunks
     this.maxTagLength = Math.max(...this.openTags.map(tag => tag.length)) * 2
-    
+
     this.state = ParserState.PRE_CONTENT
     this.initialBuffer = ''
     this.thinkingBuffer = ''
@@ -54,9 +55,39 @@ export class ThinkingParser {
   }
 
   /**
-   * Process a chunk of content through the parser
+   * Process a chunk of content through the parser.
+   * Returns a ThinkingParseResult with processed content for this chunk.
    */
   feed(content: string): ThinkingParseResult {
+    const empty: ThinkingParseResult = {
+      thinkingContent: null,
+      regularContent: null,
+      isFirstThinkingChunk: false,
+      isLastThinkingChunk: false,
+      stateChanged: false
+    }
+
+    if (!content) return empty
+
+    if (this.state === ParserState.PRE_CONTENT) {
+      return this.handlePreContent(content)
+    } else if (this.state === ParserState.IN_THINKING) {
+      return this.handleInThinking(content)
+    } else {
+      // STREAMING state - pass through unchanged
+      return { ...empty, regularContent: content }
+    }
+  }
+
+  /**
+   * Finalize parsing when the stream ends.
+   * Flushes any remaining buffered content that hasn't been emitted yet.
+   * Ported from kiro-gateway/kiro/thinking_parser.py ThinkingParser.finalize()
+   *
+   * IMPORTANT: Call this after the last chunk to ensure no content is lost,
+   * especially when the stream ends inside a <thinking> block (no closing tag).
+   */
+  finalize(): ThinkingParseResult {
     const result: ThinkingParseResult = {
       thinkingContent: null,
       regularContent: null,
@@ -65,23 +96,31 @@ export class ThinkingParser {
       stateChanged: false
     }
 
-    if (!content) {
-      return result
+    // Flush thinking buffer if stream ended while still in IN_THINKING state
+    if (this.thinkingBuffer) {
+      if (this.state === ParserState.IN_THINKING) {
+        // Stream ended without receiving closing tag — flush remaining thinking content
+        result.thinkingContent = this.processThinkingContent(this.thinkingBuffer)
+        result.isFirstThinkingChunk = this.isFirstThinkingChunk
+        result.isLastThinkingChunk = true
+        console.warn('[ThinkingParser] Stream ended inside thinking block without closing tag. Flushing remaining content.')
+      } else {
+        result.regularContent = this.thinkingBuffer
+      }
+      this.thinkingBuffer = ''
     }
 
-    if (this.state === ParserState.PRE_CONTENT) {
-      return this.handlePreContent(content)
-    } else if (this.state === ParserState.IN_THINKING) {
-      return this.handleInThinking(content)
-    } else {
-      // STREAMING state - pass through
-      result.regularContent = content
-      return result
+    // Flush initial buffer if we never found a thinking tag
+    if (this.initialBuffer) {
+      result.regularContent = (result.regularContent ?? '') + this.initialBuffer
+      this.initialBuffer = ''
     }
+
+    return result
   }
 
   /**
-   * Handle PRE_CONTENT state - looking for opening tag
+   * Handle PRE_CONTENT state — buffer and look for opening tag.
    */
   private handlePreContent(content: string): ThinkingParseResult {
     const result: ThinkingParseResult = {
@@ -94,45 +133,41 @@ export class ThinkingParser {
 
     this.initialBuffer += content
 
-    // Check if any opening tag is found
+    // Check if any opening tag is present in the buffer
     for (const tag of this.openTags) {
       const tagIndex = this.initialBuffer.indexOf(tag)
       if (tagIndex !== -1) {
-        // Found opening tag!
+        // Found opening tag — transition to IN_THINKING
         this.openTag = tag
         this.closeTag = tag.replace('<', '</')
         this.thinkingBlockFound = true
-        
-        // Content before tag is regular content
+        this.state = ParserState.IN_THINKING
+        result.stateChanged = true
+
+        // Any content before the tag is regular content
         if (tagIndex > 0) {
           result.regularContent = this.initialBuffer.substring(0, tagIndex)
         }
-        
-        // Content after tag goes to thinking buffer
-        const afterTag = this.initialBuffer.substring(tagIndex + tag.length)
-        this.thinkingBuffer = afterTag
-        
-        // Change state
-        this.state = ParserState.IN_THINKING
-        result.stateChanged = true
-        
-        // Check if we have content to send
+
+        // Content after the tag goes into the thinking buffer
+        this.thinkingBuffer = this.initialBuffer.substring(tagIndex + tag.length)
+        this.initialBuffer = ''
+
+        // Cautious send: only emit if buffer is longer than max tag length
         if (this.thinkingBuffer.length > this.maxTagLength) {
           const sendPart = this.thinkingBuffer.substring(0, this.thinkingBuffer.length - this.maxTagLength)
           this.thinkingBuffer = this.thinkingBuffer.substring(this.thinkingBuffer.length - this.maxTagLength)
-          
           result.thinkingContent = this.processThinkingContent(sendPart)
           result.isFirstThinkingChunk = this.isFirstThinkingChunk
           this.isFirstThinkingChunk = false
         }
-        
+
         return result
       }
     }
 
-    // No tag found yet - check if buffer exceeded limit
+    // No tag found — switch to STREAMING if buffer exceeds limit
     if (this.initialBuffer.length > this.initialBufferSize) {
-      // No thinking block - switch to streaming
       this.state = ParserState.STREAMING
       result.stateChanged = true
       result.regularContent = this.initialBuffer
@@ -143,7 +178,7 @@ export class ThinkingParser {
   }
 
   /**
-   * Handle IN_THINKING state - looking for closing tag
+   * Handle IN_THINKING state — look for closing tag with cautious buffering.
    */
   private handleInThinking(content: string): ThinkingParseResult {
     const result: ThinkingParseResult = {
@@ -160,38 +195,36 @@ export class ThinkingParser {
     if (this.closeTag) {
       const closeIndex = this.thinkingBuffer.indexOf(this.closeTag)
       if (closeIndex !== -1) {
-        // Found closing tag!
+        // Found closing tag — emit remaining thinking content and transition to STREAMING
         const thinkingContent = this.thinkingBuffer.substring(0, closeIndex)
         const afterClose = this.thinkingBuffer.substring(closeIndex + this.closeTag.length)
-        
-        // Send remaining thinking content
+
         if (thinkingContent) {
           result.thinkingContent = this.processThinkingContent(thinkingContent)
           result.isFirstThinkingChunk = this.isFirstThinkingChunk
           this.isFirstThinkingChunk = false
         }
-        
+
         result.isLastThinkingChunk = true
-        
-        // Switch to streaming
         this.state = ParserState.STREAMING
         result.stateChanged = true
-        
-        // Content after closing tag is regular content
-        if (afterClose) {
-          result.regularContent = afterClose
-        }
-        
         this.thinkingBuffer = ''
+
+        // Content after closing tag is regular content
+        // Strip leading whitespace/newlines that often follow the closing tag (matches Python behavior)
+        if (afterClose) {
+          const stripped = afterClose.replace(/^\s+/, '')
+          if (stripped) result.regularContent = stripped
+        }
+
         return result
       }
     }
 
-    // No closing tag yet - use cautious sending
+    // No closing tag yet — use cautious sending to avoid splitting the tag
     if (this.thinkingBuffer.length > this.maxTagLength) {
       const sendPart = this.thinkingBuffer.substring(0, this.thinkingBuffer.length - this.maxTagLength)
       this.thinkingBuffer = this.thinkingBuffer.substring(this.thinkingBuffer.length - this.maxTagLength)
-      
       result.thinkingContent = this.processThinkingContent(sendPart)
       result.isFirstThinkingChunk = this.isFirstThinkingChunk
       this.isFirstThinkingChunk = false
@@ -201,7 +234,7 @@ export class ThinkingParser {
   }
 
   /**
-   * Process thinking content based on handling mode
+   * Process thinking content according to the configured handling mode.
    */
   private processThinkingContent(content: string): string | null {
     switch (this.handlingMode) {
@@ -210,6 +243,7 @@ export class ThinkingParser {
       case 'remove':
         return null
       case 'pass':
+        // Re-wrap with original tags
         return this.openTag + content + (this.state === ParserState.STREAMING ? this.closeTag : '')
       case 'strip_tags':
         return content
@@ -218,23 +252,22 @@ export class ThinkingParser {
     }
   }
 
-  /**
-   * Get current parser state
-   */
+  /** Get the current FSM state. */
   getState(): ParserState {
     return this.state
   }
 
-  /**
-   * Check if thinking block was found
-   */
+  /** True if a thinking block was detected in this response. */
+  get foundThinkingBlock(): boolean {
+    return this.thinkingBlockFound
+  }
+
+  /** Alternate method form for backward compatibility. */
   hasThinkingBlock(): boolean {
     return this.thinkingBlockFound
   }
 
-  /**
-   * Reset parser to initial state
-   */
+  /** Reset parser to initial state (reuse for next response). */
   reset(): void {
     this.state = ParserState.PRE_CONTENT
     this.initialBuffer = ''

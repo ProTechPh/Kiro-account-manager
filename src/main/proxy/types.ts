@@ -14,7 +14,7 @@ export interface OpenAIChatRequest {
 }
 
 export interface OpenAIMessage {
-  role: 'system' | 'user' | 'assistant' | 'tool'
+  role: 'system' | 'user' | 'assistant' | 'tool' | 'function' | string
   content: string | OpenAIContentPart[]
   name?: string
   tool_calls?: OpenAIToolCall[]
@@ -111,6 +111,7 @@ export interface ClaudeContentBlock {
   type: 'text' | 'image' | 'tool_use' | 'tool_result' | 'thinking'
   text?: string
   thinking?: string
+  signature?: string  // Anthropic extended thinking: placeholder signature
   source?: { type: 'base64'; media_type: string; data: string }
   id?: string
   name?: string
