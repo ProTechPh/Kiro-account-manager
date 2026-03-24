@@ -110,6 +110,15 @@ npm run typecheck
 
 ## 📋 Changelog
 
+### v1.6.2
+
+**Proxy Engine Improvements:**
+- 🔄 **Feature Parity**: Completed full port of the Python `kiro-gateway` to the Electron proxy engine.
+- ✨ **Dynamic Model Cache**: Implemented full 4-layer resolution pipeline with live cache for `ListAvailableModels`.
+- 🐛 **Stream Parsing**: Fixed lost thinking blocks by implementing stream finalization when Kiro API terminates early.
+
+See full details: `docs/CHANGELOG-v1.6.2.md`
+
 ### v1.5.5
 
 **Bug Fixes:**

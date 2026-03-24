@@ -110,6 +110,15 @@ npm run typecheck
 
 ## 📋 更新日志
 
+### v1.6.2
+
+**代理服务改进:**
+- 🔄 **特性对齐**: 完成了 Python 版 `kiro-gateway` 到 Electron 代理引擎的全面移植。
+- ✨ **动态模型缓存**: 实现了完整的 4 层解析管道以及 `ListAvailableModels` 实时缓存。
+- 🐛 **流解析修复**: 修复了由于 Kiro API 提前终止导致的 Thinking 思考块丢失问题。
+
+完整说明见: `docs/CHANGELOG-v1.6.2.md`
+
 ### v1.5.5
 
 **Bug 修复:**
