@@ -6,6 +6,9 @@ on:
     tags:
       - 'v*.*.*'
 
+env:
+  ELECTRON_BUILDER_BINARIES_MIRROR: "https://npmmirror.com/mirrors/electron-builder-binaries/"
+
 jobs:
   # 获取版本号
   get-version:
