@@ -615,7 +615,7 @@ export async function callKiroApiStream(
       }
 
       const inputChars = payloadStr.length
-      await parseEventStream(response.body!, wrappedOnChunk, onComplete, onError, inputChars, maxInputTokens)
+      await parseEventStream(response.body!, wrappedOnChunk, onComplete, inputChars, maxInputTokens)
       clearTimeout(firstTokenTimeoutId)
       return
     } catch (error) {
@@ -638,11 +638,12 @@ export async function callKiroApiStream(
       // True monthly connection quota exhaustion (Hard Fail - not transient)
       if (errMsg.includes('Monthly request limit exceeded') || errMsg.includes('reached its monthly quota')) {
          console.log(`[KiroAPI] Account truly empty. Aborting retries and fast-switching...`)
-         throw new Error(`Quota exhausted: ` + errMsg)
+         lastError = new Error(`Quota exhausted: ` + errMsg)
+         break
       }
 
-      // Must abort the retry loop and throw the error to proxyServer.ts for other fatal issues (Auth, 400 Bad Request, context length limit)
-      throw error
+      // Must abort the retry loop and pass the error to proxyServer.ts for other fatal issues (Auth, 400 Bad Request, context length limit)
+      break
     }
   }
 
@@ -745,7 +746,6 @@ async function parseEventStream(
   body: ReadableStream<Uint8Array>,
   onChunk: (text: string, toolUse?: KiroToolUse, isThinking?: boolean) => void,
   onComplete: (usage: { inputTokens: number; outputTokens: number; credits: number; cacheReadTokens?: number; cacheWriteTokens?: number; reasoningTokens?: number }) => void,
-  onError: (error: Error) => void,
   inputChars: number = 0,
   maxInputTokens: number = 200000  // Model's max input tokens for contextUsage calculation
 ): Promise<void> {
@@ -821,6 +821,9 @@ async function parseEventStream(
           try {
             const payloadText = new TextDecoder().decode(payloadBytes)
             const event = JSON.parse(payloadText)
+            
+            // Signal that we received valid data to clear first-token timeout
+            onChunk('')
             
             // 根据 event type 处理不同类型的事件
             if (eventType === 'assistantResponseEvent' || event.assistantResponseEvent) {
@@ -1146,7 +1149,7 @@ async function parseEventStream(
     proxyLogger.info('Kiro', 'Stream complete, final usage', usage)
     onComplete(usage)
   } catch (error) {
-    onError(error as Error)
+    throw error
   } finally {
     reader.releaseLock()
   }

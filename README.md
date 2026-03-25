@@ -110,6 +110,14 @@ npm run typecheck
 
 ## 📋 Changelog
 
+### v1.6.6
+
+**Bug Fixes:**
+- 🐛 **Tool Call Execution Timeouts**: Fixed a critical bug where massive IDE agent tool use requests would trip the proxy's 15-second first-token timeout before full completion. We now proactively signal the proxy as soon as the initial data packet arrives.
+- 🐛 **Lost Stream AbortErrors**: Solved an infinite hang scenario where internal runtime token chunking errors were swallowed instead of passing up to the core connection pool. The proxy now properly transitions to the retry handler for seamless endpoint recovery.
+
+See full details: `docs/CHANGELOG-v1.6.6.md`
+
 ### v1.6.4
 
 **Bug Fixes:**
