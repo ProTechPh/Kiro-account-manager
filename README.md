@@ -110,6 +110,13 @@ npm run typecheck
 
 ## 📋 Changelog
 
+### v1.6.4
+
+**Bug Fixes:**
+- 🐛 **API Quota Exhaustion & Smart Retry**: Fixed an infinite API retry loop on generic rate limits (`429`). Now intelligently prioritizes fallback endpoints with exponential backoff (`1s`, `2s`, `4s` delays) for transient high volume, while fully enabling the `AccountPool` to auto-switch instances instantaneously upon hard limits (`Monthly limit exceeded`).
+
+See full details: `docs/CHANGELOG-v1.6.4.md`
+
 ### v1.6.3
 
 **Bug Fixes:**

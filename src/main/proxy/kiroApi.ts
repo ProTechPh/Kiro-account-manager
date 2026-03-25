@@ -520,6 +520,8 @@ export async function callKiroApiStream(
     attempts.push(...endpoints)
   }
 
+  let retryCount = 0
+
   for (const endpoint of attempts) {
     if (signal?.aborted) break
 
@@ -563,25 +565,26 @@ export async function callKiroApiStream(
 
       clearTimeout(totalTimeoutId)
 
+      // 429 means too many requests (transient high volume rate limit)
       if (response.status === 429) {
         clearTimeout(firstTokenTimeoutId)
-        // Exponential backoff for rate limiting (1s, 2s, 4s...)
-        const attemptIndex = attempts.indexOf(endpoint)
-        const delay = Math.min(1000 * Math.pow(2, attemptIndex % endpoints.length), 8000)
-        console.log(`[KiroAPI] Endpoint ${endpoint.name} quota exhausted, waiting ${delay}ms...`)
+        // Proper exponential backoff for rate limiting (1s, 2s, 4s...)
+        const delay = Math.min(1000 * Math.pow(2, retryCount), 8000)
+        console.log(`[KiroAPI] Endpoint ${endpoint.name} high volume rate limit (429), waiting ${delay}ms...`)
         await new Promise(r => setTimeout(r, delay))
-        lastError = new Error(`Quota exhausted on ${endpoint.name}`)
+        lastError = new Error(`Rate limit exceeded on ${endpoint.name} (429)`)
+        retryCount++
         continue
       }
 
       if (response.status >= 500) {
         clearTimeout(firstTokenTimeoutId)
         const body = await response.text()
-        const attemptIndex = attempts.indexOf(endpoint)
-        const delay = Math.min(1000 * Math.pow(2, attemptIndex % endpoints.length), 8000)
+        const delay = Math.min(1000 * Math.pow(2, retryCount), 8000)
         console.log(`[KiroAPI] Server error ${response.status} on ${endpoint.name}, waiting ${delay}ms...`)
         await new Promise(r => setTimeout(r, delay))
         lastError = new Error(`Server error ${response.status}: ${body.substring(0, 200)}`)
+        retryCount++
         continue
       }
 
@@ -622,12 +625,24 @@ export async function callKiroApiStream(
       if ((error as Error).name === 'AbortError') {
         console.log(`[KiroAPI] Endpoint ${endpoint.name} timed out, trying next...`)
         lastError = new Error(`Request timeout on ${endpoint.name}`)
+        retryCount++
         continue
       }
 
-      if ((error as Error).message.includes('Auth error')) {
-        throw error
+      // If it's a server error (5xx) or Rate Limit (429), we want to retry it
+      const errMsg = (error as Error).message || ''
+      if (errMsg.includes('Server error') || errMsg.includes('Rate limit exceeded')) {
+        continue
       }
+
+      // True monthly connection quota exhaustion (Hard Fail - not transient)
+      if (errMsg.includes('Monthly request limit exceeded') || errMsg.includes('reached its monthly quota')) {
+         console.log(`[KiroAPI] Account truly empty. Aborting retries and fast-switching...`)
+         throw new Error(`Quota exhausted: ` + errMsg)
+      }
+
+      // Must abort the retry loop and throw the error to proxyServer.ts for other fatal issues (Auth, 400 Bad Request, context length limit)
+      throw error
     }
   }
 
