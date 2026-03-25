@@ -110,6 +110,13 @@ npm run typecheck
 
 ## 📋 Changelog
 
+### v1.6.7
+
+**Bug Fixes:**
+- 🐛 **Thinking Token Exhaustion**: Fixed a prompt truncation issue by capping the proxy's `max_thinking_length` to 4,000 tokens instead of 200,000, reserving adequate capacity for the actual file writes and tool calls without blowing past the 8,192 API limits limit.
+
+See full details: `docs/CHANGELOG-v1.6.7.md`
+
 ### v1.6.6
 
 **Bug Fixes:**

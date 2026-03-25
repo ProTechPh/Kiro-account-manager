@@ -66,7 +66,7 @@ REMEMBER: When in doubt, write LESS per operation. Multiple small operations > o
 
 // Thinking 模式标签
 export const THINKING_MODE_PROMPT = `<thinking_mode>enabled</thinking_mode>
-<max_thinking_length>200000</max_thinking_length>
+<max_thinking_length>4000</max_thinking_length>
 <thinking_instruction>Think in English for better reasoning quality.
 
 Your thinking process should be thorough and systematic:
