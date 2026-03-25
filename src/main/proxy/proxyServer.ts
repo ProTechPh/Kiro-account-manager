@@ -55,7 +55,8 @@ export class ProxyServer {
 
   private markRecentClientCancel(): void {
     // 短暂阻断后续自动请求，确保用户点停止后链路真正停下
-    this.recentClientCancelUntil = Date.now() + 8000
+    // Disabled to prevent breaking Claude Code multi-agent behaviors
+    // this.recentClientCancelUntil = Date.now() + 8000
   }
 
   private isWithinRecentClientCancelWindow(): boolean {
@@ -1164,11 +1165,13 @@ export class ProxyServer {
           }
         }
         req.once('aborted', () => {
-          this.markRecentClientCancel()
+          if (!res.writableEnded) {
+            this.markRecentClientCancel()
+          }
           abortStream()
         })
         req.once('close', () => {
-          if (req.aborted) {
+          if (req.aborted && !res.writableEnded) {
             this.markRecentClientCancel()
           }
           abortStream()
@@ -1528,11 +1531,13 @@ export class ProxyServer {
           }
         }
         req.once('aborted', () => {
-          this.markRecentClientCancel()
+          if (!res.writableEnded) {
+            this.markRecentClientCancel()
+          }
           abortStream()
         })
         req.once('close', () => {
-          if (req.aborted) {
+          if (req.aborted && !res.writableEnded) {
             this.markRecentClientCancel()
           }
           abortStream()
