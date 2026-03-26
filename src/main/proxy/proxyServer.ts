@@ -801,6 +801,9 @@ export class ProxyServer {
       } else if (pathWithoutQuery.startsWith('/admin/')) {
         // 管理 API 端点
         await this.handleAdminApi(req, res, pathWithoutQuery)
+      } else if (pathWithoutQuery.startsWith('/api/v1/keys')) {
+        // API Key 管理端点
+        await this.handleApiKeyManagement(req, res, pathWithoutQuery)
       } else {
         // 记录未知路径以便调试
         console.log(`[ProxyServer] Unknown path: ${path} (method: ${method})`)
@@ -910,6 +913,368 @@ export class ProxyServer {
     res.end(JSON.stringify({
       recentRequests: this.stats.recentRequests.slice(-100)
     }))
+  }
+
+  // API Key 管理端点
+  private async handleApiKeyManagement(req: http.IncomingMessage, res: http.ServerResponse, path: string): Promise<void> {
+    const method = req.method || 'GET'
+
+    // API Key 管理需要认证
+    const authResult = this.validateApiKey(req)
+    if (!authResult.valid) {
+      this.sendError(res, 401, 'API key management requires authentication')
+      return
+    }
+
+    // 解析路径和参数
+    const pathParts = path.split('/')
+    const keyId = pathParts[4] // /api/v1/keys/{keyId}
+    const action = pathParts[5] // /api/v1/keys/{keyId}/{action}
+
+    try {
+      if (path === '/api/v1/keys' && method === 'GET') {
+        // 列出所有 API Keys
+        this.handleListApiKeys(res)
+      } else if (path === '/api/v1/keys' && method === 'POST') {
+        // 创建新 API Key
+        const body = await this.readBody(req)
+        const params = JSON.parse(body)
+        this.handleCreateApiKey(res, params)
+      } else if (path === '/api/v1/keys/bulk' && method === 'POST') {
+        // 批量操作
+        const body = await this.readBody(req)
+        const params = JSON.parse(body)
+        this.handleBulkApiKeyOperation(res, params)
+      } else if (keyId && path === `/api/v1/keys/${keyId}` && method === 'GET') {
+        // 获取特定 API Key
+        this.handleGetApiKey(res, keyId)
+      } else if (keyId && path === `/api/v1/keys/${keyId}` && method === 'PUT') {
+        // 更新 API Key
+        const body = await this.readBody(req)
+        const updates = JSON.parse(body)
+        this.handleUpdateApiKey(res, keyId, updates)
+      } else if (keyId && path === `/api/v1/keys/${keyId}` && method === 'DELETE') {
+        // 删除 API Key
+        this.handleDeleteApiKey(res, keyId)
+      } else if (keyId && action === 'regenerate' && method === 'POST') {
+        // 重新生成 API Key
+        this.handleRegenerateApiKey(res, keyId)
+      } else if (keyId && action === 'usage' && method === 'GET') {
+        // 获取使用统计
+        const url = new URL(req.url || '', `http://${req.headers.host}`)
+        const period = url.searchParams.get('period') || '7d'
+        const groupBy = url.searchParams.get('groupBy') || 'day'
+        const model = url.searchParams.get('model') || undefined
+        this.handleGetApiKeyUsage(res, keyId, { period, groupBy, model })
+      } else {
+        this.sendError(res, 404, 'API key endpoint not found')
+      }
+    } catch (error) {
+      console.error('[ProxyServer] API key management error:', error)
+      this.sendError(res, 500, (error as Error).message)
+    }
+  }
+
+  // 列出所有 API Keys
+  private handleListApiKeys(res: http.ServerResponse): void {
+    const apiKeys = this.config.apiKeys || []
+    const maskedKeys = apiKeys.map(key => ({
+      ...key,
+      key: this.maskApiKey(key.key)
+    }))
+
+    res.writeHead(200, { 'Content-Type': 'application/json' })
+    res.end(JSON.stringify({
+      success: true,
+      data: maskedKeys,
+      total: maskedKeys.length
+    }))
+  }
+
+  // 创建新 API Key
+  private handleCreateApiKey(res: http.ServerResponse, params: {
+    name: string
+    format?: import('./types').ApiKeyFormat
+    creditsLimit?: number
+    enabled?: boolean
+  }): void {
+    if (!params.name) {
+      this.sendError(res, 400, 'Name is required')
+      return
+    }
+
+    const apiKey: import('./types').ApiKey = {
+      id: uuidv4(),
+      name: params.name,
+      key: this.generateApiKey(params.format || 'sk'),
+      format: params.format || 'sk',
+      enabled: params.enabled !== false,
+      createdAt: Date.now(),
+      creditsLimit: params.creditsLimit,
+      usage: {
+        totalRequests: 0,
+        totalCredits: 0,
+        totalInputTokens: 0,
+        totalOutputTokens: 0,
+        daily: {},
+        byModel: {}
+      },
+      usageHistory: []
+    }
+
+    if (!this.config.apiKeys) {
+      this.config.apiKeys = []
+    }
+    this.config.apiKeys.push(apiKey)
+    this.events.onConfigChanged?.(this.config)
+
+    res.writeHead(201, { 'Content-Type': 'application/json' })
+    res.end(JSON.stringify({
+      success: true,
+      data: apiKey
+    }))
+  }
+
+  // 获取特定 API Key
+  private handleGetApiKey(res: http.ServerResponse, keyId: string): void {
+    const apiKey = this.config.apiKeys?.find(k => k.id === keyId)
+    if (!apiKey) {
+      this.sendError(res, 404, 'API key not found')
+      return
+    }
+
+    const maskedKey = {
+      ...apiKey,
+      key: this.maskApiKey(apiKey.key)
+    }
+
+    res.writeHead(200, { 'Content-Type': 'application/json' })
+    res.end(JSON.stringify({
+      success: true,
+      data: maskedKey
+    }))
+  }
+
+  // 更新 API Key
+  private handleUpdateApiKey(res: http.ServerResponse, keyId: string, updates: Partial<Pick<import('./types').ApiKey, 'name' | 'enabled' | 'creditsLimit'>>): void {
+    if (!this.config.apiKeys) {
+      this.sendError(res, 404, 'API key not found')
+      return
+    }
+
+    const keyIndex = this.config.apiKeys.findIndex(k => k.id === keyId)
+    if (keyIndex === -1) {
+      this.sendError(res, 404, 'API key not found')
+      return
+    }
+
+    this.config.apiKeys[keyIndex] = { ...this.config.apiKeys[keyIndex], ...updates }
+    this.events.onConfigChanged?.(this.config)
+
+    res.writeHead(200, { 'Content-Type': 'application/json' })
+    res.end(JSON.stringify({
+      success: true,
+      data: {
+        id: keyId,
+        ...updates,
+        updatedAt: Date.now()
+      }
+    }))
+  }
+
+  // 删除 API Key
+  private handleDeleteApiKey(res: http.ServerResponse, keyId: string): void {
+    if (!this.config.apiKeys) {
+      this.sendError(res, 404, 'API key not found')
+      return
+    }
+
+    const keyIndex = this.config.apiKeys.findIndex(k => k.id === keyId)
+    if (keyIndex === -1) {
+      this.sendError(res, 404, 'API key not found')
+      return
+    }
+
+    this.config.apiKeys.splice(keyIndex, 1)
+    this.events.onConfigChanged?.(this.config)
+
+    res.writeHead(200, { 'Content-Type': 'application/json' })
+    res.end(JSON.stringify({
+      success: true,
+      message: 'API key deleted successfully'
+    }))
+  }
+
+  // 重新生成 API Key
+  private handleRegenerateApiKey(res: http.ServerResponse, keyId: string): void {
+    if (!this.config.apiKeys) {
+      this.sendError(res, 404, 'API key not found')
+      return
+    }
+
+    const keyIndex = this.config.apiKeys.findIndex(k => k.id === keyId)
+    if (keyIndex === -1) {
+      this.sendError(res, 404, 'API key not found')
+      return
+    }
+
+    const apiKey = this.config.apiKeys[keyIndex]
+    const newKey = this.generateApiKey(apiKey.format)
+    this.config.apiKeys[keyIndex] = { ...apiKey, key: newKey }
+    this.events.onConfigChanged?.(this.config)
+
+    res.writeHead(200, { 'Content-Type': 'application/json' })
+    res.end(JSON.stringify({
+      success: true,
+      data: {
+        id: keyId,
+        key: newKey,
+        regeneratedAt: Date.now()
+      }
+    }))
+  }
+
+  // 获取 API Key 使用统计
+  private handleGetApiKeyUsage(res: http.ServerResponse, keyId: string, options: {
+    period: string
+    groupBy: string
+    model?: string
+  }): void {
+    const apiKey = this.config.apiKeys?.find(k => k.id === keyId)
+    if (!apiKey) {
+      this.sendError(res, 404, 'API key not found')
+      return
+    }
+
+    const now = Date.now()
+    let periodStart = 0
+
+    switch (options.period) {
+      case '1d': periodStart = now - 24 * 60 * 60 * 1000; break
+      case '7d': periodStart = now - 7 * 24 * 60 * 60 * 1000; break
+      case '30d': periodStart = now - 30 * 24 * 60 * 60 * 1000; break
+      case '90d': periodStart = now - 90 * 24 * 60 * 60 * 1000; break
+      case 'all': periodStart = 0; break
+    }
+
+    // Filter usage history by period and model
+    const filteredHistory = (apiKey.usageHistory || []).filter(record =>
+      record.timestamp >= periodStart && (!options.model || record.model === options.model)
+    )
+
+    // Group by day (simplified)
+    const dailyStats: Record<string, any> = {}
+    const totals = { requests: 0, credits: 0, inputTokens: 0, outputTokens: 0 }
+
+    filteredHistory.forEach(record => {
+      const date = new Date(record.timestamp).toISOString().split('T')[0]
+      if (!dailyStats[date]) {
+        dailyStats[date] = { date, requests: 0, credits: 0, inputTokens: 0, outputTokens: 0, models: {} }
+      }
+      dailyStats[date].requests++
+      dailyStats[date].credits += record.credits
+      dailyStats[date].inputTokens += record.inputTokens
+      dailyStats[date].outputTokens += record.outputTokens
+
+      if (!dailyStats[date].models[record.model]) {
+        dailyStats[date].models[record.model] = { requests: 0, credits: 0 }
+      }
+      dailyStats[date].models[record.model].requests++
+      dailyStats[date].models[record.model].credits += record.credits
+
+      totals.requests++
+      totals.credits += record.credits
+      totals.inputTokens += record.inputTokens
+      totals.outputTokens += record.outputTokens
+    })
+
+    res.writeHead(200, { 'Content-Type': 'application/json' })
+    res.end(JSON.stringify({
+      success: true,
+      data: {
+        period: options.period,
+        groupBy: options.groupBy,
+        stats: Object.values(dailyStats),
+        totals
+      }
+    }))
+  }
+
+  // 批量操作
+  private handleBulkApiKeyOperation(res: http.ServerResponse, params: {
+    action: 'enable' | 'disable' | 'delete'
+    keyIds: string[]
+  }): void {
+    if (!params.action || !params.keyIds || !Array.isArray(params.keyIds)) {
+      this.sendError(res, 400, 'Invalid bulk operation parameters')
+      return
+    }
+
+    if (!this.config.apiKeys) {
+      this.config.apiKeys = []
+    }
+
+    const results: Array<{ keyId: string; success: boolean; error?: string }> = []
+
+    params.keyIds.forEach(keyId => {
+      try {
+        const keyIndex = this.config.apiKeys!.findIndex(k => k.id === keyId)
+        if (keyIndex === -1) {
+          results.push({ keyId, success: false, error: 'Key not found' })
+          return
+        }
+
+        switch (params.action) {
+          case 'enable':
+            this.config.apiKeys![keyIndex].enabled = true
+            results.push({ keyId, success: true })
+            break
+          case 'disable':
+            this.config.apiKeys![keyIndex].enabled = false
+            results.push({ keyId, success: true })
+            break
+          case 'delete':
+            this.config.apiKeys!.splice(keyIndex, 1)
+            results.push({ keyId, success: true })
+            break
+        }
+      } catch (error) {
+        results.push({ keyId, success: false, error: (error as Error).message })
+      }
+    })
+
+    this.events.onConfigChanged?.(this.config)
+
+    res.writeHead(200, { 'Content-Type': 'application/json' })
+    res.end(JSON.stringify({
+      success: true,
+      data: {
+        processed: params.keyIds.length,
+        results
+      }
+    }))
+  }
+
+  // 生成 API Key
+  private generateApiKey(format: import('./types').ApiKeyFormat): string {
+    const randomPart = uuidv4().replace(/-/g, '')
+
+    switch (format) {
+      case 'sk':
+        return `sk-kiro-${randomPart}`
+      case 'simple':
+        return randomPart
+      case 'token':
+        return `kiro_${randomPart}`
+      default:
+        return `sk-kiro-${randomPart}`
+    }
+  }
+
+  // 掩码 API Key（用于显示）
+  private maskApiKey(key: string): string {
+    if (key.length <= 8) return key
+    return key.substring(0, 8) + '***masked***'
   }
 
   // 设置 CORS 头

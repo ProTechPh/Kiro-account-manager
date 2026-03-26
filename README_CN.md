@@ -61,6 +61,13 @@
 ### 🌐 代理支持
 - 支持 HTTP/HTTPS/SOCKS5 代理
 
+### 🔑 API Key 管理
+- 独立的多 API Key 管理系统
+- RESTful API 端点支持 CRUD 操作
+- 用量跟踪，包含 Credits、Token 和请求统计
+- Credits 额度限制和配额管理
+- 三种密钥格式：sk-kiro-*、simple、token
+
 ---
 
 ## 📸 截图
@@ -109,6 +116,19 @@ npm run typecheck
 ---
 
 ## 📋 更新日志
+
+### v1.7.0
+
+**新功能:**
+- 🔑 **API Key 管理系统**: 完整的独立多 API Key 管理，支持 RESTful 端点
+- 📊 **用量跟踪**: 每个 API Key 的详细请求、Token 和 Credits 统计
+- 🔒 **Credits 额度限制**: 为单个 API Key 设置和强制执行 Credits 限制
+- 🔧 **三种密钥格式**: 支持 sk-kiro-*、simple 和 token 格式
+- 🌐 **RESTful API**: 通过 `/api/v1/keys` 端点进行完整的 CRUD 操作
+- 📈 **实时监控**: 实时用量跟踪，支持按日和按模型统计
+- 🔐 **安全特性**: Bearer token 认证、密钥掩码和启用/禁用控制
+
+完整说明见: `docs/CHANGELOG-v1.7.0.md`
 
 ### v1.6.9
 

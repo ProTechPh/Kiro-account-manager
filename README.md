@@ -61,6 +61,13 @@
 ### 🌐 Proxy Support
 - Support HTTP/HTTPS/SOCKS5 proxy
 
+### 🔑 API Key Management
+- Independent multi-API key system
+- RESTful API endpoints for CRUD operations
+- Usage tracking with credits, tokens, and request statistics
+- Credit limits and quota management
+- Three key formats: sk-kiro-*, simple, token
+
 ---
 
 ## 📸 Screenshots
@@ -109,6 +116,19 @@ npm run typecheck
 ---
 
 ## 📋 Changelog
+
+### v1.7.0
+
+**New Features:**
+- 🔑 **API Key Management System**: Complete independent multi-API key management with RESTful endpoints
+- 📊 **Usage Tracking**: Detailed statistics for requests, tokens, and credits per API key
+- 🔒 **Credit Limits**: Set and enforce credit limits for individual API keys
+- 🔧 **Three Key Formats**: Support for sk-kiro-*, simple, and token formats
+- 🌐 **RESTful API**: Full CRUD operations via `/api/v1/keys` endpoints
+- 📈 **Real-time Monitoring**: Live usage tracking with daily and model-based statistics
+- 🔐 **Security Features**: Bearer token authentication, key masking, and enable/disable controls
+
+See full details: `docs/CHANGELOG-v1.7.0.md`
 
 ### v1.6.9
 
