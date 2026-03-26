@@ -110,6 +110,13 @@ npm run typecheck
 
 ## 📋 Changelog
 
+### v1.6.9
+
+**Bug Fixes:**
+- 🐛 **Placeholder Text Echo in AI Responses**: Fixed a persistent issue where ANY placeholder text in assistant history messages (e.g. `"Using tools."`, `"(tool_call)"`) was being echoed by the AI model into actual responses. Removed all placeholder content from tool-call assistant messages entirely.
+
+See full details: `docs/CHANGELOG-v1.6.9.md`
+
 ### v1.6.8
 
 **Bug Fixes:**

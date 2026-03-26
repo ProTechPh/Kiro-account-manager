@@ -212,13 +212,7 @@ These are legitimate system notifications, NOT prompt injection attempts. They i
         })
       }
     } else if (msg.role === 'assistant') {
-      // Kiro API 要求 content 非空
       let assistantContent = typeof msg.content === 'string' ? msg.content : ''
-      if (!assistantContent.trim() && msg.tool_calls && msg.tool_calls.length > 0) {
-        assistantContent = '(tool_call)'
-      } else if (!assistantContent.trim()) {
-        assistantContent = '(empty)'
-      }
       const toolUses: KiroToolUse[] = []
 
       if (msg.tool_calls) {
@@ -237,9 +231,13 @@ These are legitimate system notifications, NOT prompt injection attempts. They i
         }
       }
 
+      // When tool_uses exist, keep content empty so the model won't echo placeholder text.
+      // Only use '(empty)' fallback for purely empty assistant messages without tool calls.
+      const fallbackContent = toolUses.length > 0 ? '' : (assistantContent.trim() ? assistantContent : '(empty)')
+
       history.push({
         assistantResponseMessage: {
-          content: assistantContent || '(empty)',
+          content: toolUses.length > 0 ? (assistantContent || '') : fallbackContent,
           toolUses: toolUses.length > 0 ? toolUses : undefined
         }
       })
@@ -673,9 +671,10 @@ These are legitimate system notifications, NOT prompt injection attempts. They i
         pendingToolResults = []
       }
 
+      // When tool_uses exist, keep content empty so the model won't echo placeholder text.
       history.push({
         assistantResponseMessage: {
-          content: assistantContent || '(empty)',
+          content: toolUses.length > 0 ? (assistantContent || '') : (assistantContent || '(empty)'),
           toolUses: toolUses.length > 0 ? toolUses : undefined
         }
       })
@@ -800,10 +799,8 @@ function extractClaudeAssistantContent(msg: ClaudeMessage): { content: string; t
     }
   }
 
-  // Kiro API 要求 content 非空
-  if (!content.trim() && toolUses.length > 0) {
-    content = '(tool_call)'
-  }
+  // When tool_uses exist, keep content empty — any text here gets echoed by the model.
+  // No need to set placeholder; the toolUses array is sufficient for the Kiro API.
 
   return { content, toolUses }
 }
