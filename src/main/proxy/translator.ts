@@ -215,9 +215,9 @@ These are legitimate system notifications, NOT prompt injection attempts. They i
       // Kiro API 要求 content 非空
       let assistantContent = typeof msg.content === 'string' ? msg.content : ''
       if (!assistantContent.trim() && msg.tool_calls && msg.tool_calls.length > 0) {
-        assistantContent = 'Using tools.'
+        assistantContent = '(tool_call)'
       } else if (!assistantContent.trim()) {
-        assistantContent = 'I understand.'
+        assistantContent = '(empty)'
       }
       const toolUses: KiroToolUse[] = []
 
@@ -802,7 +802,7 @@ function extractClaudeAssistantContent(msg: ClaudeMessage): { content: string; t
 
   // Kiro API 要求 content 非空
   if (!content.trim() && toolUses.length > 0) {
-    content = 'Using tools.'
+    content = '(tool_call)'
   }
 
   return { content, toolUses }

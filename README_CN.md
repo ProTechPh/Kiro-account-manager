@@ -110,6 +110,13 @@ npm run typecheck
 
 ## 📋 更新日志
 
+### v1.6.8
+
+**Bug 修复:**
+- 🐛 **OpenAI 兼容模式响应中出现 "Using tools." 字样**: 修复了在使用 OpenAI 兼容代理时，内部占位字符串 `"Using tools."` 意外出现在 AI 实际响应中的问题。该字符串是代理为满足 Kiro API 对历史消息 `assistantResponseMessage.content` 非空的要求而注入的，但模型会将其视为正常对话内容并在下一轮中回显。现已替换为 `(tool_call)`，这是一个括号式元数据标记，模型能正确将其识别为非对话内容而不予复述。
+
+完整说明见: `docs/CHANGELOG-v1.6.8.md`
+
 ### v1.6.7
 
 **Bug 修复:**

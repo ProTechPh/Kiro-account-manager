@@ -110,6 +110,13 @@ npm run typecheck
 
 ## 📋 Changelog
 
+### v1.6.8
+
+**Bug Fixes:**
+- 🐛 **OpenAI-Compatible "Using tools." Leak**: Fixed a bug where the internal placeholder string `"Using tools."` was appearing in actual AI responses when using the OpenAI-compatible proxy. The string—required by the Kiro API to satisfy a non-empty history constraint—was being echoed back by the model. Replaced with `(tool_call)`, a parenthetical metadata marker the model correctly ignores.
+
+See full details: `docs/CHANGELOG-v1.6.8.md`
+
 ### v1.6.7
 
 **Bug Fixes:**
