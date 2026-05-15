@@ -767,6 +767,176 @@ export function ProxyPanel() {
                 />
                 <p className="text-xs text-muted-foreground">{t('proxyPanel.thinkingOutputHint')}</p>
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="thinkingBudgetTokens">{t('proxyPanel.thinkingBudgetTokens')}</Label>
+                <Input
+                  id="thinkingBudgetTokens"
+                  type="number"
+                  min={500}
+                  max={50000}
+                  value={(config as any).thinkingBudgetTokens || 4000}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value) || 4000
+                    setConfig(prev => ({ ...prev, thinkingBudgetTokens: val } as any))
+                    window.api.proxyUpdateConfig({ thinkingBudgetTokens: val } as any)
+                  }}
+                  disabled={isRunning}
+                />
+                <p className="text-xs text-muted-foreground">{t('proxyPanel.thinkingBudgetTokensHint')}</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="thinkingBudgetCap">{t('proxyPanel.thinkingBudgetCap')}</Label>
+                <Input
+                  id="thinkingBudgetCap"
+                  type="number"
+                  min={0}
+                  max={100000}
+                  value={(config as any).thinkingBudgetCap || 10000}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value) || 10000
+                    setConfig(prev => ({ ...prev, thinkingBudgetCap: val } as any))
+                    window.api.proxyUpdateConfig({ thinkingBudgetCap: val } as any)
+                  }}
+                  disabled={isRunning}
+                />
+                <p className="text-xs text-muted-foreground">{t('proxyPanel.thinkingBudgetCapHint')}</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="payloadMaxBytes">{t('proxyPanel.payloadMaxBytes')}</Label>
+                <Input
+                  id="payloadMaxBytes"
+                  type="number"
+                  min={100000}
+                  max={1048576}
+                  step={50000}
+                  value={(config as any).payloadMaxBytes || 600000}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value) || 600000
+                    setConfig(prev => ({ ...prev, payloadMaxBytes: val } as any))
+                    window.api.proxyUpdateConfig({ payloadMaxBytes: val } as any)
+                  }}
+                  disabled={isRunning}
+                />
+                <p className="text-xs text-muted-foreground">{t('proxyPanel.payloadMaxBytesHint')}</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="autoTrimPayload">{t('proxyPanel.autoTrimPayload')}</Label>
+                <div className="flex items-center justify-between h-9 px-3 rounded-md border border-input bg-transparent">
+                  <span className="text-sm text-muted-foreground">{t('proxyPanel.autoTrimPayloadDesc')}</span>
+                  <Switch
+                    id="autoTrimPayload"
+                    checked={(config as any).autoTrimPayload !== false}
+                    onCheckedChange={(checked) => {
+                      setConfig(prev => ({ ...prev, autoTrimPayload: checked } as any))
+                      window.api.proxyUpdateConfig({ autoTrimPayload: checked } as any)
+                    }}
+                    disabled={isRunning}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">{t('proxyPanel.autoTrimPayloadHint')}</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="firstTokenTimeout">{t('proxyPanel.firstTokenTimeout')}</Label>
+                <Input
+                  id="firstTokenTimeout"
+                  type="number"
+                  min={5}
+                  max={60}
+                  value={(config as any).firstTokenTimeout || 15}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value) || 15
+                    setConfig(prev => ({ ...prev, firstTokenTimeout: val } as any))
+                    window.api.proxyUpdateConfig({ firstTokenTimeout: val } as any)
+                  }}
+                  disabled={isRunning}
+                />
+                <p className="text-xs text-muted-foreground">{t('proxyPanel.firstTokenTimeoutHint')}</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="firstTokenMaxRetries">{t('proxyPanel.firstTokenMaxRetries')}</Label>
+                <Input
+                  id="firstTokenMaxRetries"
+                  type="number"
+                  min={1}
+                  max={10}
+                  value={(config as any).firstTokenMaxRetries || 3}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value) || 3
+                    setConfig(prev => ({ ...prev, firstTokenMaxRetries: val } as any))
+                    window.api.proxyUpdateConfig({ firstTokenMaxRetries: val } as any)
+                  }}
+                  disabled={isRunning}
+                />
+                <p className="text-xs text-muted-foreground">{t('proxyPanel.firstTokenMaxRetriesHint')}</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="streamingReadTimeout">{t('proxyPanel.streamingReadTimeout')}</Label>
+                <Input
+                  id="streamingReadTimeout"
+                  type="number"
+                  min={30}
+                  max={600}
+                  value={(config as any).streamingReadTimeout || 300}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value) || 300
+                    setConfig(prev => ({ ...prev, streamingReadTimeout: val } as any))
+                    window.api.proxyUpdateConfig({ streamingReadTimeout: val } as any)
+                  }}
+                  disabled={isRunning}
+                />
+                <p className="text-xs text-muted-foreground">{t('proxyPanel.streamingReadTimeoutHint')}</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="circuitBreakerBaseTimeout">{t('proxyPanel.circuitBreakerBaseTimeout')}</Label>
+                <Input
+                  id="circuitBreakerBaseTimeout"
+                  type="number"
+                  min={10}
+                  max={300}
+                  value={(config as any).circuitBreakerBaseTimeout || 60}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value) || 60
+                    setConfig(prev => ({ ...prev, circuitBreakerBaseTimeout: val } as any))
+                    window.api.proxyUpdateConfig({ circuitBreakerBaseTimeout: val } as any)
+                  }}
+                  disabled={isRunning}
+                />
+                <p className="text-xs text-muted-foreground">{t('proxyPanel.circuitBreakerBaseTimeoutHint')}</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="circuitBreakerRetryChance">{t('proxyPanel.circuitBreakerRetryChance')}</Label>
+                <Input
+                  id="circuitBreakerRetryChance"
+                  type="number"
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  value={(config as any).circuitBreakerRetryChance || 0.1}
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value) || 0.1
+                    setConfig(prev => ({ ...prev, circuitBreakerRetryChance: val } as any))
+                    window.api.proxyUpdateConfig({ circuitBreakerRetryChance: val } as any)
+                  }}
+                  disabled={isRunning}
+                />
+                <p className="text-xs text-muted-foreground">{t('proxyPanel.circuitBreakerRetryChanceHint')}</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="webSearchEnabled">{t('proxyPanel.webSearchEnabled')}</Label>
+                <div className="flex items-center justify-between h-9 px-3 rounded-md border border-input bg-transparent">
+                  <span className="text-sm text-muted-foreground">{t('proxyPanel.webSearchEnabledDesc')}</span>
+                  <Switch
+                    id="webSearchEnabled"
+                    checked={(config as any).webSearchEnabled || false}
+                    onCheckedChange={(checked) => {
+                      setConfig(prev => ({ ...prev, webSearchEnabled: checked } as any))
+                      window.api.proxyUpdateConfig({ webSearchEnabled: checked } as any)
+                    }}
+                    disabled={isRunning}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">{t('proxyPanel.webSearchEnabledHint')}</p>
+              </div>
             </div>
           </div>
         </CardContent>

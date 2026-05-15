@@ -68,6 +68,14 @@
 - Credit limits and quota management
 - Three key formats: sk-kiro-*, simple, token
 
+### 🛡️ Advanced Proxy Engine
+- **Circuit Breaker**: Exponential backoff with probabilistic retry for multi-account failover
+- **Configurable Timeouts**: First token timeout, streaming read timeout, max retries
+- **Payload Size Guard**: Configurable payload limit with auto-trim or error mode
+- **Fake Reasoning Budget Cap**: Prevent model from spending all output tokens on thinking
+- **Web Search Tool Injection**: Auto-inject web_search tool for MCP emulation
+- **Truncation Recovery**: Automatic detection and recovery from truncated API responses
+
 ---
 
 ## 📸 Screenshots
@@ -116,6 +124,18 @@ npm run typecheck
 ---
 
 ## 📋 Changelog
+
+### v1.7.1
+
+**New Features:**
+- 🛡️ **Circuit Breaker Exponential Backoff**: Smart cooldown with `base × 2^(failures-1)` formula + probabilistic retry (10% chance) to prevent permanent stuck accounts
+- ⏱️ **Configurable Streaming Timeouts**: First token timeout (15s), max retries (3), streaming read timeout (5min) — all adjustable from UI
+- 🔍 **Web Search Tool Auto-Injection**: MCP emulation — auto-inject `web_search` tool so models can search the web
+- 📦 **Payload Size Guard**: Configurable limit (600KB default) with auto-trim toggle — no more silent data loss
+- 🧠 **Fake Reasoning Budget Cap**: Default budget (4000 tokens) + max cap (10000) to prevent model spending all output on thinking
+- 🖥️ **10 New UI Settings**: All features exposed in the Advanced Settings panel with full EN/ZH translations
+
+See full details: `docs/CHANGELOG-v1.7.1.md`
 
 ### v1.7.0
 

@@ -95,6 +95,8 @@ export interface ClaudeRequest {
   system?: string | ClaudeSystemBlock[]
   tools?: ClaudeTool[]
   tool_choice?: { type: string; name?: string }
+  // Anthropic Extended Thinking support
+  thinking?: { type: 'enabled'; budget_tokens?: number }
 }
 
 export interface ClaudeMessage {
@@ -343,6 +345,31 @@ export interface ProxyConfig {
   modelThinkingMode?: Record<string, boolean>
   // 思考内容输出格式：reasoning_content / thinking / think
   thinkingOutputFormat?: 'reasoning_content' | 'thinking' | 'think'
+  // Payload 大小限制（字节，默认 600000 = 600KB，Kiro API 硬限制约 615KB）
+  payloadMaxBytes?: number
+  // 超出 payload 限制时自动裁剪历史（false 时返回错误）
+  autoTrimPayload?: boolean
+  // 思考模式默认 token 预算（客户端未指定时使用，默认 4000）
+  thinkingBudgetTokens?: number
+  // 思考模式最大 token 预算上限（防止模型花费过多输出在推理上，默认 10000，0=不限制）
+  thinkingBudgetCap?: number
+  // ============ Circuit Breaker 配置 ============
+  // 基础恢复超时（秒），用于指数退避。实际超时 = base * 2^(failures-1)
+  circuitBreakerBaseTimeout?: number
+  // 最大退避倍数上限（默认 1440，即 base*1440 = 最大冷却时间）
+  circuitBreakerMaxMultiplier?: number
+  // 概率性重试机会（0.0-1.0），即使账号处于冷却期也有此概率尝试（默认 0.1 = 10%）
+  circuitBreakerRetryChance?: number
+  // ============ First Token Timeout 配置 ============
+  // 等待模型首个 token 的超时时间（秒，默认 15）
+  firstTokenTimeout?: number
+  // 首个 token 超时后最大重试次数（默认 3）
+  firstTokenMaxRetries?: number
+  // 流式响应读取超时（秒，默认 300 = 5分钟）
+  streamingReadTimeout?: number
+  // ============ Web Search 配置 ============
+  // 自动注入 web_search 工具（默认 false）
+  webSearchEnabled?: boolean
   // 模型映射规则
   modelMappings?: ModelMappingRule[]
 }

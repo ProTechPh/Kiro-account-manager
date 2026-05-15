@@ -1,16 +1,21 @@
-// 多账号轮询管理器
+// 多账号轮询管理器 - Circuit Breaker with Exponential Backoff
 import type { ProxyAccount, AccountStats } from './types'
 
 export interface AccountPoolConfig {
-  cooldownMs: number // 错误后冷却时间
-  maxErrorCount: number // 最大连续错误次数
+  cooldownMs: number // 基础恢复超时（毫秒）- 用于指数退避
+  maxErrorCount: number // 最大连续错误次数（触发冷却）
   quotaResetMs: number // 配额重置时间
+  // Circuit Breaker 增强配置
+  maxBackoffMultiplier: number // 最大退避倍数上限（默认 1440 = 1天 with 60s base）
+  probabilisticRetryChance: number // 概率性重试机会（0.0-1.0，默认 0.1）
 }
 
 const DEFAULT_CONFIG: AccountPoolConfig = {
-  cooldownMs: 60000, // 1分钟冷却
+  cooldownMs: 60000, // 1分钟基础冷却
   maxErrorCount: 3, // 3次错误后暂停
-  quotaResetMs: 3600000 // 1小时配额重置
+  quotaResetMs: 3600000, // 1小时配额重置
+  maxBackoffMultiplier: 1440, // 最大 1440 倍 = 60s * 1440 = 86400s = 1天
+  probabilisticRetryChance: 0.1 // 10% 概率重试
 }
 
 export class AccountPool {
@@ -21,6 +26,11 @@ export class AccountPool {
 
   constructor(config: Partial<AccountPoolConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config }
+  }
+
+  // 更新配置（运行时）
+  updateConfig(config: Partial<AccountPoolConfig>): void {
+    this.config = { ...this.config, ...config }
   }
 
   // 添加账号
@@ -83,7 +93,14 @@ export class AccountPool {
       attempts++
     }
 
-    // 没有可用账号，返回冷却时间最短的
+    // 没有可用账号，尝试概率性重试
+    const probabilisticAccount = this.tryProbabilisticRetry(accountList, now)
+    if (probabilisticAccount) {
+      console.log(`[AccountPool] Probabilistic retry: using account ${probabilisticAccount.email || probabilisticAccount.id} (${(this.config.probabilisticRetryChance * 100).toFixed(0)}% chance)`)
+      return probabilisticAccount
+    }
+
+    // 返回冷却时间最短的
     return this.getAccountWithShortestCooldown(accountList, now)
   }
 
@@ -108,8 +125,14 @@ export class AccountPool {
       }
     }
 
-    // 没有立即可用的账号，返回冷却时间最短的（排除当前账号）
+    // 尝试概率性重试（排除当前账号）
     const otherAccounts = accountList.filter(a => a.id !== excludeAccountId)
+    const probabilisticAccount = this.tryProbabilisticRetry(otherAccounts, now)
+    if (probabilisticAccount) {
+      return probabilisticAccount
+    }
+
+    // 没有立即可用的账号，返回冷却时间最短的（排除当前账号）
     return this.getAccountWithShortestCooldown(otherAccounts, now)
   }
 
@@ -125,8 +148,8 @@ export class AccountPool {
       return false
     }
 
-    // 检查错误计数
-    if ((account.errorCount || 0) >= this.config.maxErrorCount) {
+    // 检查错误计数（只有在没有冷却时间时才检查）
+    if ((account.errorCount || 0) >= this.config.maxErrorCount && !account.cooldownUntil) {
       return false
     }
 
@@ -136,6 +159,37 @@ export class AccountPool {
     }
 
     return account.isAvailable !== false
+  }
+
+  // 概率性重试：即使账号在冷却期，也有一定概率尝试
+  private tryProbabilisticRetry(accounts: ProxyAccount[], now: number): ProxyAccount | null {
+    if (this.config.probabilisticRetryChance <= 0) return null
+
+    // 只对处于冷却期的账号尝试概率性重试
+    const cooldownAccounts = accounts.filter(a => 
+      a.cooldownUntil && a.cooldownUntil > now && 
+      a.isAvailable !== false &&
+      !(a.expiresAt && a.expiresAt < now)
+    )
+
+    if (cooldownAccounts.length === 0) return null
+
+    // 对每个冷却中的账号掷骰子
+    if (Math.random() < this.config.probabilisticRetryChance) {
+      // 选择错误次数最少的账号
+      cooldownAccounts.sort((a, b) => (a.errorCount || 0) - (b.errorCount || 0))
+      return cooldownAccounts[0]
+    }
+
+    return null
+  }
+
+  // 计算指数退避冷却时间
+  private calculateExponentialBackoff(errorCount: number): number {
+    // timeout = base * 2^(failures - 1), capped at base * maxMultiplier
+    const exponent = Math.min(errorCount - 1, 20) // 防止溢出
+    const multiplier = Math.min(Math.pow(2, exponent), this.config.maxBackoffMultiplier)
+    return Math.round(this.config.cooldownMs * multiplier)
   }
 
   // 获取冷却时间最短的账号
@@ -165,7 +219,8 @@ export class AccountPool {
         requestCount: (account.requestCount || 0) + 1,
         errorCount: 0, // 重置错误计数
         lastUsed: Date.now(),
-        isAvailable: true
+        isAvailable: true,
+        cooldownUntil: undefined // 成功后清除冷却
       })
     }
 
@@ -180,7 +235,7 @@ export class AccountPool {
     }
   }
 
-  // 记录请求失败
+  // 记录请求失败（使用指数退避）
   recordError(accountId: string, isQuotaError: boolean = false): void {
     const account = this.accounts.get(accountId)
     if (!account) return
@@ -188,7 +243,7 @@ export class AccountPool {
     const errorCount = (account.errorCount || 0) + 1
     const now = Date.now()
 
-    let cooldownUntil = account.cooldownUntil || 0
+    let cooldownUntil: number | undefined
     let isAvailable = account.isAvailable !== false
 
     if (isQuotaError) {
@@ -196,9 +251,11 @@ export class AccountPool {
       cooldownUntil = now + this.config.quotaResetMs
       console.log(`[AccountPool] Account ${account.email || accountId} quota exhausted, cooldown until ${new Date(cooldownUntil).toISOString()}`)
     } else if (errorCount >= this.config.maxErrorCount) {
-      // 连续错误过多，进入冷却
-      cooldownUntil = now + this.config.cooldownMs
-      console.log(`[AccountPool] Account ${account.email || accountId} too many errors, cooldown until ${new Date(cooldownUntil).toISOString()}`)
+      // 连续错误过多，使用指数退避计算冷却时间
+      const backoffMs = this.calculateExponentialBackoff(errorCount)
+      cooldownUntil = now + backoffMs
+      const backoffSec = Math.round(backoffMs / 1000)
+      console.log(`[AccountPool] Account ${account.email || accountId} circuit breaker: ${errorCount} errors, backoff ${backoffSec}s (until ${new Date(cooldownUntil).toISOString()})`)
     }
 
     this.accounts.set(accountId, {

@@ -80,6 +80,24 @@ After completing your thinking, respond in the same language the user is using i
 
 Take the time you need. Quality of thought matters more than speed.</thinking_instruction>`
 
+// 动态生成 Thinking 模式标签（支持自定义 budget）
+export function buildThinkingModePrompt(budgetTokens: number = 4000): string {
+  return `<thinking_mode>enabled</thinking_mode>
+<max_thinking_length>${budgetTokens}</max_thinking_length>
+<thinking_instruction>Think in English for better reasoning quality.
+
+Your thinking process should be thorough and systematic:
+- First, make sure you fully understand what is being asked
+- Consider multiple approaches or perspectives when relevant
+- Think about edge cases, potential issues, and what could go wrong
+- Challenge your initial assumptions
+- Verify your reasoning before reaching a conclusion
+
+After completing your thinking, respond in the same language the user is using in their messages, or in the language specified in their settings if available.
+
+Take the time you need. Quality of thought matters more than speed.</thinking_instruction>`
+}
+
 // GPT alias → Claude model (kept for backward compatibility)
 const GPT_ALIASES: Record<string, string> = {
   'gpt-4': 'claude-sonnet-4.5',
@@ -311,7 +329,8 @@ export function buildKiroPayload(
   toolResults: KiroToolResult[] = [],
   images: KiroImage[] = [],
   profileArn?: string,
-  inferenceConfig?: { maxTokens?: number; temperature?: number; topP?: number }
+  inferenceConfig?: { maxTokens?: number; temperature?: number; topP?: number },
+  payloadOptions?: { maxBytes?: number; autoTrim?: boolean }
 ): KiroPayload {
   // 构建当前消息
   const finalContent = content.trim() || (toolResults.length > 0 ? '' : 'Continue')
@@ -371,8 +390,9 @@ export function buildKiroPayload(
     }
   }
 
-  // 限制 payload 大小（最大 1MB）
-  const MAX_PAYLOAD_SIZE = 1048576 // 1MB
+  // 限制 payload 大小（可配置，默认 600KB）
+  const MAX_PAYLOAD_SIZE = payloadOptions?.maxBytes || 600000
+  const autoTrim = payloadOptions?.autoTrim !== false // 默认启用自动裁剪
   let payload: KiroPayload = {
     conversationState: {
       chatTriggerType: 'MANUAL',
@@ -386,6 +406,10 @@ export function buildKiroPayload(
 
   // 如果超出最大 payload 大小，循环移除最早的 history 直到满足要求
   let payloadStr = JSON.stringify(payload)
+  if (payloadStr.length > MAX_PAYLOAD_SIZE && !autoTrim) {
+    // 不自动裁剪时抛出错误
+    throw new Error(`Payload size ${payloadStr.length} bytes exceeds limit ${MAX_PAYLOAD_SIZE} bytes. Enable auto-trim or reduce message history.`)
+  }
   while (payloadStr.length > MAX_PAYLOAD_SIZE && sanitizedHistory.length > 0) {
     sanitizedHistory.shift()
     payload.conversationState.history = sanitizedHistory.length > 0 ? sanitizedHistory : undefined
@@ -476,8 +500,35 @@ function getSortedEndpoints(preferredEndpoint?: 'codewhisperer' | 'amazonq'): ty
 }
 
 // First-token timeout: if model doesn't start responding within this time, retry
-const FIRST_TOKEN_TIMEOUT_MS = 15000 // 15s (matches kiro-gateway default)
-const FIRST_TOKEN_MAX_RETRIES = 3
+// These are defaults — can be overridden via ProxyConfig
+let FIRST_TOKEN_TIMEOUT_MS = 15000 // 15s (matches kiro-gateway default)
+let FIRST_TOKEN_MAX_RETRIES = 3
+let STREAMING_READ_TIMEOUT_MS = 300000 // 5 minutes
+
+// 运行时更新超时配置
+export function updateStreamingTimeouts(config: {
+  firstTokenTimeout?: number
+  firstTokenMaxRetries?: number
+  streamingReadTimeout?: number
+}): void {
+  if (config.firstTokenTimeout !== undefined) {
+    FIRST_TOKEN_TIMEOUT_MS = config.firstTokenTimeout * 1000
+  }
+  if (config.firstTokenMaxRetries !== undefined) {
+    FIRST_TOKEN_MAX_RETRIES = config.firstTokenMaxRetries
+  }
+  if (config.streamingReadTimeout !== undefined) {
+    STREAMING_READ_TIMEOUT_MS = config.streamingReadTimeout * 1000
+  }
+}
+
+export function getStreamingTimeouts(): { firstTokenTimeoutMs: number; firstTokenMaxRetries: number; streamingReadTimeoutMs: number } {
+  return {
+    firstTokenTimeoutMs: FIRST_TOKEN_TIMEOUT_MS,
+    firstTokenMaxRetries: FIRST_TOKEN_MAX_RETRIES,
+    streamingReadTimeoutMs: STREAMING_READ_TIMEOUT_MS
+  }
+}
 
 /**
  * Enhances Kiro API error JSON with user-friendly messages.
@@ -538,11 +589,11 @@ export async function callKiroApiStream(
 
       const headers = getAuthHeaders(account, endpoint)
 
-      // Total request timeout (30s)
+      // Total request timeout (uses streaming read timeout for overall limit)
       const totalController = new AbortController()
-      const totalTimeoutId = setTimeout(() => totalController.abort(), 30000)
+      const totalTimeoutId = setTimeout(() => totalController.abort(), STREAMING_READ_TIMEOUT_MS)
 
-      // First-token timeout (15s) — aborts if model doesn't start responding
+      // First-token timeout — aborts if model doesn't start responding
       const firstTokenController = new AbortController()
       let firstTokenReceived = false
       const firstTokenTimeoutId = setTimeout(() => {

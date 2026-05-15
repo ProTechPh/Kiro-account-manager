@@ -12,13 +12,14 @@ import type {
   TokenRefreshCallback
 } from './types'
 import { AccountPool } from './accountPool'
-import { callKiroApiStream, callKiroApi, fetchKiroModels, type KiroModel, THINKING_MODE_PROMPT } from './kiroApi'
+import { callKiroApiStream, callKiroApi, fetchKiroModels, type KiroModel, buildThinkingModePrompt, updateStreamingTimeouts } from './kiroApi'
 import { modelResolver } from './modelResolver'
 import { classifyNetworkError } from './networkErrors'
 import { parseBracketToolCalls } from './gatewayUtils'
 import { getToolTruncation, getContentTruncation, generateTruncationToolResult, TRUNCATION_USER_MESSAGE } from './truncationState'
 import { proxyLogger } from './logger'
 import { ThinkingParser } from './thinkingParser'
+import { injectWebSearchTool } from './webSearchTool'
 import {
   openaiToKiro,
   claudeToKiro,
@@ -78,7 +79,11 @@ export class ProxyServer {
       autoStart: false, // 是否自动启动
       ...config
     }
-    this.accountPool = new AccountPool()
+    this.accountPool = new AccountPool({
+      cooldownMs: (this.config.circuitBreakerBaseTimeout || 60) * 1000,
+      maxBackoffMultiplier: this.config.circuitBreakerMaxMultiplier || 1440,
+      probabilisticRetryChance: this.config.circuitBreakerRetryChance || 0.1
+    })
     this.stats = {
       totalRequests: 0,
       successRequests: 0,
@@ -100,6 +105,12 @@ export class ProxyServer {
       startTime: 0
     }
     this.events = events
+    // 初始化流式超时配置
+    updateStreamingTimeouts({
+      firstTokenTimeout: this.config.firstTokenTimeout,
+      firstTokenMaxRetries: this.config.firstTokenMaxRetries,
+      streamingReadTimeout: this.config.streamingReadTimeout
+    })
   }
 
   // 启动服务器
@@ -224,6 +235,22 @@ export class ProxyServer {
   // 更新配置
   updateConfig(config: Partial<ProxyConfig>): void {
     this.config = { ...this.config, ...config }
+    // 同步更新 AccountPool 配置
+    if (config.circuitBreakerBaseTimeout !== undefined || config.circuitBreakerMaxMultiplier !== undefined || config.circuitBreakerRetryChance !== undefined) {
+      this.accountPool.updateConfig({
+        cooldownMs: (this.config.circuitBreakerBaseTimeout || 60) * 1000,
+        maxBackoffMultiplier: this.config.circuitBreakerMaxMultiplier || 1440,
+        probabilisticRetryChance: this.config.circuitBreakerRetryChance || 0.1
+      })
+    }
+    // 同步更新流式超时配置
+    if (config.firstTokenTimeout !== undefined || config.firstTokenMaxRetries !== undefined || config.streamingReadTimeout !== undefined) {
+      updateStreamingTimeouts({
+        firstTokenTimeout: this.config.firstTokenTimeout,
+        firstTokenMaxRetries: this.config.firstTokenMaxRetries,
+        streamingReadTimeout: this.config.streamingReadTimeout
+      })
+    }
   }
 
   // 获取配置
@@ -1492,13 +1519,35 @@ export class ProxyServer {
         : processedRequest
 
       // 转换为 Kiro 格式
-      let kiroPayload = openaiToKiro(finalRequest, account.profileArn)
+      let kiroPayload = openaiToKiro(finalRequest, account.profileArn, {
+        maxBytes: this.config.payloadMaxBytes || 600000,
+        autoTrim: this.config.autoTrimPayload !== false
+      })
 
-      // 如果启用了 thinking 模式，注入系统提示
+      // 自动注入 web_search 工具（如果启用）
+      if (this.config.webSearchEnabled) {
+        const currentMessage = kiroPayload.conversationState?.currentMessage?.userInputMessage
+        if (currentMessage) {
+          if (!currentMessage.userInputMessageContext) {
+            currentMessage.userInputMessageContext = {}
+          }
+          const existingTools = currentMessage.userInputMessageContext.tools || []
+          currentMessage.userInputMessageContext.tools = injectWebSearchTool(existingTools)
+        }
+      }
+
+      // 如果启用了 thinking 模式，注入系统提示（支持 budget cap）
       if (thinkingEnabled) {
         const currentMessage = kiroPayload.conversationState?.currentMessage?.userInputMessage
         if (currentMessage && typeof currentMessage.content === 'string') {
-          currentMessage.content = THINKING_MODE_PROMPT + '\n\n' + currentMessage.content
+          // 确定 thinking budget：使用配置的默认值，并应用 cap
+          let thinkingBudget = this.config.thinkingBudgetTokens || 4000
+          const budgetCap = this.config.thinkingBudgetCap || 10000
+          if (budgetCap > 0 && thinkingBudget > budgetCap) {
+            thinkingBudget = budgetCap
+          }
+          const thinkingPrompt = buildThinkingModePrompt(thinkingBudget)
+          currentMessage.content = thinkingPrompt + '\n\n' + currentMessage.content
         }
         proxyLogger.info('ProxyServer', 'Thinking mode enabled for request')
       }
@@ -1800,7 +1849,7 @@ export class ProxyServer {
 
     // 检查是否为该模型默认启用思考模式
     const modelThinkingEnabled = this.config.modelThinkingMode?.[request.model]
-    const thinkingEnabled = modelThinkingEnabled || (req.headers['anthropic-beta'] as string || '').toLowerCase().includes('thinking')
+    const thinkingEnabled = modelThinkingEnabled || (req.headers['anthropic-beta'] as string || '').toLowerCase().includes('thinking') || request.thinking?.type === 'enabled'
 
     this.recordNewRequest()
     this.events.onRequest?.({ path: '/v1/messages', method: 'POST' })
@@ -1858,13 +1907,37 @@ export class ProxyServer {
         : request
 
       // 转换为 Kiro 格式
-      let kiroPayload = claudeToKiro(claudeRequest, account.profileArn)
+      let kiroPayload = claudeToKiro(claudeRequest, account.profileArn, {
+        maxBytes: this.config.payloadMaxBytes || 600000,
+        autoTrim: this.config.autoTrimPayload !== false
+      })
 
-      // 如果启用了 thinking 模式，注入系统提示
+      // 自动注入 web_search 工具（如果启用）
+      if (this.config.webSearchEnabled) {
+        const currentMessage = kiroPayload.conversationState?.currentMessage?.userInputMessage
+        if (currentMessage) {
+          if (!currentMessage.userInputMessageContext) {
+            currentMessage.userInputMessageContext = {}
+          }
+          const existingTools = currentMessage.userInputMessageContext.tools || []
+          currentMessage.userInputMessageContext.tools = injectWebSearchTool(existingTools)
+        }
+      }
+
+      // 如果启用了 thinking 模式，注入系统提示（支持 budget cap）
       if (thinkingEnabled) {
         const currentMessage = kiroPayload.conversationState?.currentMessage?.userInputMessage
         if (currentMessage && typeof currentMessage.content === 'string') {
-          currentMessage.content = THINKING_MODE_PROMPT + '\n\n' + currentMessage.content
+          // 确定 thinking budget：优先使用客户端指定的 budget，否则使用配置默认值
+          let thinkingBudget = request.thinking?.budget_tokens || this.config.thinkingBudgetTokens || 4000
+          const budgetCap = this.config.thinkingBudgetCap || 10000
+          // 应用 budget cap（0 = 不限制）
+          if (budgetCap > 0 && thinkingBudget > budgetCap) {
+            proxyLogger.info('ProxyServer', `Thinking budget capped: ${thinkingBudget} -> ${budgetCap}`)
+            thinkingBudget = budgetCap
+          }
+          const thinkingPrompt = buildThinkingModePrompt(thinkingBudget)
+          currentMessage.content = thinkingPrompt + '\n\n' + currentMessage.content
         }
         proxyLogger.info('ProxyServer', 'Thinking mode enabled for Claude request')
       }

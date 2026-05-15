@@ -1,6 +1,5 @@
-ignoredBuiltDependencies:
-  - cbor-extract
-  - esbuild
-
-onlyBuiltDependencies:
-  - electron
+allowBuilds:
+  better-sqlite3: true
+  cbor-extract: false
+  electron: true
+  esbuild: true

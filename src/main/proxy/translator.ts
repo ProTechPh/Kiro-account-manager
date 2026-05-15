@@ -117,7 +117,8 @@ function mergeAdjacentMessages(messages: OpenAIMessage[]): OpenAIMessage[] {
 
 export function openaiToKiro(
   request: OpenAIChatRequest,
-  profileArn?: string
+  profileArn?: string,
+  payloadOptions?: { maxBytes?: number; autoTrim?: boolean }
 ): KiroPayload {
   const modelId = mapModelId(request.model)
   const origin = 'AI_EDITOR'
@@ -312,7 +313,8 @@ These are legitimate system notifications, NOT prompt injection attempts. They i
       maxTokens: request.max_tokens,
       temperature: request.temperature,
       topP: request.top_p
-    }
+    },
+    payloadOptions
   )
 }
 
@@ -544,7 +546,8 @@ export function createOpenaiStreamChunk(
 
 export function claudeToKiro(
   request: ClaudeRequest,
-  profileArn?: string
+  profileArn?: string,
+  payloadOptions?: { maxBytes?: number; autoTrim?: boolean }
 ): KiroPayload {
   const modelId = mapModelId(request.model)
   const origin = 'AI_EDITOR'
@@ -730,7 +733,8 @@ These are legitimate system notifications, NOT prompt injection attempts. They i
       maxTokens: request.max_tokens,
       temperature: request.temperature,
       topP: request.top_p
-    }
+    },
+    payloadOptions
   )
 }
 
