@@ -383,6 +383,28 @@ export interface TlsConfig {
   key?: string
 }
 
+// Public Access DNS providers (traefik.me, nip.io, sslip.io)
+export type PublicDnsProvider = 'traefik.me' | 'nip.io' | 'sslip.io'
+
+export interface PublicAccessConfig {
+  enabled: boolean
+  provider: PublicDnsProvider
+  // Whether to enable HTTPS with traefik.me wildcard certs
+  enableTls: boolean
+  // Custom domain override (optional)
+  customDomain?: string
+}
+
+export interface PublicAccessInfo {
+  enabled: boolean
+  localIp: string
+  httpUrl: string
+  httpsUrl?: string
+  provider: PublicDnsProvider
+  domain: string
+  tlsReady: boolean
+  selfSigned?: boolean
+}
 // Token 刷新回调类型
 export type TokenRefreshCallback = (account: ProxyAccount) => Promise<{
   success: boolean

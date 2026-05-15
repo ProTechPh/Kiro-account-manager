@@ -1092,6 +1092,89 @@ const en = {
     refreshModelsFailed: 'Failed to refresh models'
   },
 
+  // Public Access (Cloudflare Tunnel)
+  publicAccess: {
+    title: 'Public Access',
+    description: 'Expose your proxy to the internet via Cloudflare Tunnel',
+    disabled: 'Offline',
+    tunnelConnected: 'Connected',
+    tunnelStart: 'Start Tunnel',
+    tunnelStop: 'Stop Tunnel',
+    tunnelConnecting: 'Connecting...',
+    tunnelDownloading: 'Downloading',
+    tunnelNeedsProxy: 'Start the proxy server first',
+    tunnelPublicUrl: 'Public URL (HTTPS)',
+    tunnelUrlHint: 'Share this URL to access your proxy from anywhere. Encrypted via Cloudflare.',
+    tunnelHint: 'Creates a secure tunnel via Cloudflare (no account needed). First use downloads cloudflared (~30MB).',
+    benefitAnywhere: 'Access anywhere',
+    benefitShare: 'Share with team',
+    benefitEncrypted: 'End-to-end TLS',
+    benefitNoAccount: 'No account needed',
+    securityWarning: 'Your proxy is exposed to the internet. Make sure to set an API Key for authentication.'
+  },
+
+  // MITM Bridge
+  mitmBridge: {
+    title: 'MITM Bridge',
+    description: 'Intercept IDE traffic — use IDE subscriptions with any backend',
+    running: 'Running',
+    stopped: 'Stopped',
+    rootCa: 'Root CA Certificate',
+    certInstalled: 'Trusted by system',
+    certNotInstalled: 'Not installed — required for HTTPS interception',
+    installCert: 'Install',
+    exportCert: 'Export',
+    start: 'Start Bridge',
+    stop: 'Stop Bridge',
+    howTitle: 'How it works',
+    howDesc: 'Intercepts HTTPS traffic from IDE tools, redirects API calls through your proxy server. Supports model remapping and multi-account routing.',
+    recentRequests: 'Recent Intercepted',
+    warning: 'MITM Bridge modifies system DNS and installs a Root CA. Only use on your own machine.',
+    adminRequired: 'Requires running as Administrator (port 443)'
+  },
+
+  // Real-Time Quota
+  quota: {
+    title: 'Real-Time Quota',
+    description: 'Live token tracking, reset countdown, cost estimation',
+    inputTokens: 'Input',
+    outputTokens: 'Output',
+    estCost: 'Est. Cost',
+    estCostHint: 'Not actual billing',
+    tokensPerMin: 'Tokens/min',
+    accountQuotas: 'Account Quotas',
+    accounts: 'accounts',
+    resetIn: 'Reset in',
+    noAccounts: 'Add active accounts to see quota tracking'
+  },
+
+  // Proxy Pools
+  proxyPools: {
+    title: 'Proxy Pools',
+    description: 'Outbound proxies & Vercel relay for IP rotation and region-restricted providers',
+    add: 'Add Proxy',
+    edit: 'Edit Proxy',
+    vercelRelay: 'Vercel Relay',
+    batchImport: 'Batch Import',
+    loading: 'Loading...',
+    empty: 'No proxy pools yet. Add a proxy or deploy a Vercel relay.',
+    name: 'Name',
+    url: 'Proxy URL',
+    noProxy: 'No Proxy (bypass)',
+    active: 'Active',
+    strict: 'Strict Proxy',
+    strictHint: 'Fail if proxy unreachable (no fallback to direct)',
+    save: 'Save',
+    cancel: 'Cancel',
+    import: 'Import',
+    vercelTitle: 'Deploy Vercel Relay',
+    vercelWhat: 'What is Vercel Relay?',
+    vercelDesc: 'Deploys an edge relay to Vercel. Requests go through Vercel edge IPs (hundreds of IPs across 20+ regions). Providers cannot block Vercel IPs without affecting millions of apps. Free tier: 100GB/month.',
+    batchTitle: 'Batch Import Proxies',
+    batchLabel: 'Paste proxy list (one per line)',
+    batchHint: 'Formats: http://user:pass@host:port or host:port:user:pass'
+  },
+
   // Account Select Dialog
   accountSelect: {
     title: 'Select Account',

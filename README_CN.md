@@ -76,6 +76,31 @@
 - **Web Search 工具注入**: 自动注入 web_search 工具实现 MCP 模拟
 - **截断恢复**: 自动检测和恢复被截断的 API 响应
 
+### 🌐 公网访问 — Cloudflare Tunnel
+- 一键生成公网 URL（通过 Cloudflare 快速隧道，无需账号）
+- 免费 `https://*.trycloudflare.com` 地址，自带有效 HTTPS
+- 自动下载 `cloudflared`，实时状态和进度显示
+- 将代理端点分享给互联网上的任何人
+
+### 🔀 代理池 — 出站代理 & Vercel 中继
+- 管理可复用的出站代理池（HTTP/SOCKS）
+- **Vercel 中继**: 一键部署边缘中继，将 IP 隐藏在 Vercel 边缘网络后
+- **批量导入**: 支持多种格式粘贴代理列表
+- 每个代理池独立连通性测试、严格模式、启用/禁用切换
+
+### 📊 实时配额
+- 实时 Token 追踪（输入/输出）及费用估算
+- 每账号配额进度条，颜色状态指示
+- 重置倒计时（如 "重置于 4h 30m"）
+- 每 60 秒自动刷新
+
+### 🛡️ MITM 桥接
+- 在端口 443 拦截 Kiro IDE HTTPS 流量
+- 根 CA 证书生成及系统信任存储安装
+- 基于 SNI 的动态叶证书生成
+- 将拦截的请求转发到本地代理服务器
+- 支持：Kiro IDE、Cursor、GitHub Copilot、Antigravity
+
 ---
 
 ## 📸 截图
@@ -124,6 +149,16 @@ npm run typecheck
 ---
 
 ## 📋 更新日志
+
+### v1.8.0
+
+**新功能：**
+- 🌐 **公网访问（Cloudflare Tunnel）**: 一键通过 `cloudflared` 快速隧道生成公网 URL — 免费 HTTPS，无需账号
+- 🔀 **代理池**: 出站代理管理，支持 HTTP/SOCKS、Vercel 中继部署、批量导入
+- 📊 **实时配额**: 实时 Token 追踪、费用估算、每账号配额进度条及重置倒计时
+- 🛡️ **MITM 桥接**: 在端口 443 拦截 IDE HTTPS 流量，根 CA 生成、动态 SNI 证书、请求转发
+
+详见: `docs/CHANGELOG-v1.8.0.md`
 
 ### v1.7.1
 

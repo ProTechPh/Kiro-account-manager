@@ -8,6 +8,10 @@ import { ModelsDialog } from './ModelsDialog'
 import { ModelMappingDialog } from './ModelMappingDialog'
 import { AccountSelectDialog } from './AccountSelectDialog'
 import { ApiKeyManager } from './ApiKeyManager'
+import { PublicAccessPanel } from './PublicAccessPanel'
+import { ProxyPoolsPanel } from './ProxyPoolsPanel'
+import { QuotaPanel } from './QuotaPanel'
+import { MitmBridgePanel } from './MitmBridgePanel'
 import { createPortal } from 'react-dom'
 
 interface ProxyStats {
@@ -942,6 +946,15 @@ export function ProxyPanel() {
         </CardContent>
       </Card>
 
+      {/* Public Access Panel */}
+      <PublicAccessPanel isRunning={isRunning} port={config.port} />
+
+      {/* Proxy Pools Panel */}
+      <ProxyPoolsPanel />
+
+      {/* MITM Bridge Panel */}
+      <MitmBridgePanel />
+
       {/* 统计卡片 */}
       {isRunning && (
         <div className="grid grid-cols-6 gap-3">
@@ -1029,6 +1042,9 @@ export function ProxyPanel() {
           </Card>
         </div>
       )}
+
+      {/* Real-Time Quota Panel */}
+      <QuotaPanel isRunning={isRunning} stats={stats} />
 
       {/* API 端点说明 */}
       <Card className="border-0 shadow-sm hover:shadow-md transition-shadow duration-200">

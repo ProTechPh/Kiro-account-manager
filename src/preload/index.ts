@@ -645,6 +645,125 @@ const api = {
     return ipcRenderer.invoke('proxy-reset-api-key-usage', id)
   },
 
+  // ============ Cloudflare Tunnel API ============
+
+  // 启动 Cloudflare Tunnel
+  proxyTunnelStart: (port?: number): Promise<{ success: boolean; tunnelUrl?: string; error?: string }> => {
+    return ipcRenderer.invoke('proxy-tunnel-start', port)
+  },
+
+  // 停止 Cloudflare Tunnel
+  proxyTunnelStop: (): Promise<{ success: boolean; error?: string }> => {
+    return ipcRenderer.invoke('proxy-tunnel-stop')
+  },
+
+  // 获取 Tunnel 状态
+  proxyTunnelStatus: (): Promise<{ enabled: boolean; running: boolean; tunnelUrl: string | null; downloading: boolean; downloadProgress: number; error: string | null }> => {
+    return ipcRenderer.invoke('proxy-tunnel-status')
+  },
+
+  // 监听 Tunnel 状态变化
+  onProxyTunnelStatusChange: (callback: (status: { enabled: boolean; running: boolean; tunnelUrl: string | null; downloading: boolean; downloadProgress: number; error: string | null }) => void): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, status: { enabled: boolean; running: boolean; tunnelUrl: string | null; downloading: boolean; downloadProgress: number; error: string | null }): void => {
+      callback(status)
+    }
+    ipcRenderer.on('proxy-tunnel-status-change', handler)
+    return () => {
+      ipcRenderer.removeListener('proxy-tunnel-status-change', handler)
+    }
+  },
+
+  // ============ Proxy Pools API ============
+
+  // 获取所有 Proxy Pools
+  proxyPoolsList: (filter?: { isActive?: boolean }): Promise<{ success: boolean; pools: Array<{ id: string; name: string; proxyUrl: string; noProxy: string; type: string; isActive: boolean; strictProxy: boolean; testStatus: string; lastTestedAt: string | null; lastError: string | null; createdAt: string; updatedAt: string }> }> => {
+    return ipcRenderer.invoke('proxy-pools-list', filter)
+  },
+
+  // 创建 Proxy Pool
+  proxyPoolsCreate: (data: { name: string; proxyUrl: string; noProxy?: string; type?: string; isActive?: boolean; strictProxy?: boolean }): Promise<{ success: boolean; pool?: any; error?: string }> => {
+    return ipcRenderer.invoke('proxy-pools-create', data)
+  },
+
+  // 更新 Proxy Pool
+  proxyPoolsUpdate: (id: string, data: { name?: string; proxyUrl?: string; noProxy?: string; isActive?: boolean; strictProxy?: boolean }): Promise<{ success: boolean; pool?: any; error?: string }> => {
+    return ipcRenderer.invoke('proxy-pools-update', id, data)
+  },
+
+  // 删除 Proxy Pool
+  proxyPoolsDelete: (id: string): Promise<{ success: boolean; error?: string }> => {
+    return ipcRenderer.invoke('proxy-pools-delete', id)
+  },
+
+  // 测试 Proxy Pool
+  proxyPoolsTest: (id: string): Promise<{ ok: boolean; status: number; elapsedMs?: number; error?: string }> => {
+    return ipcRenderer.invoke('proxy-pools-test', id)
+  },
+
+  // 部署 Vercel Relay
+  proxyPoolsVercelDeploy: (vercelToken: string, projectName?: string): Promise<{ success: boolean; deployUrl?: string; pool?: any; error?: string }> => {
+    return ipcRenderer.invoke('proxy-pools-vercel-deploy', vercelToken, projectName)
+  },
+
+  // 批量导入 Proxies
+  proxyPoolsBatchImport: (lines: string[]): Promise<{ success: boolean; created: number; skipped: number; failed: number }> => {
+    return ipcRenderer.invoke('proxy-pools-batch-import', lines)
+  },
+
+  // ============ MITM Bridge API ============
+
+  kproxyGetStatus: (): Promise<{ running: boolean; config: unknown; stats: unknown; caInfo: unknown }> => {
+    return ipcRenderer.invoke('kproxy-get-status')
+  },
+
+  kproxyInstallCaCert: (): Promise<{ success: boolean; message?: string; error?: string }> => {
+    return ipcRenderer.invoke('kproxy-install-ca-cert')
+  },
+
+  kproxyUninstallCaCert: (): Promise<{ success: boolean; message?: string; error?: string }> => {
+    return ipcRenderer.invoke('kproxy-uninstall-ca-cert')
+  },
+
+  kproxyCheckCaCertInstalled: (): Promise<{ success: boolean; installed: boolean; error?: string }> => {
+    return ipcRenderer.invoke('kproxy-check-ca-cert-installed')
+  },
+
+  kproxyGetCaCert: (): Promise<{ success: boolean; certPem?: string; certPath?: string; fingerprint?: string; error?: string }> => {
+    return ipcRenderer.invoke('kproxy-get-ca-cert')
+  },
+
+  kproxyExportCaCert: (exportPath?: string): Promise<{ success: boolean; path?: string; error?: string }> => {
+    return ipcRenderer.invoke('kproxy-export-ca-cert', exportPath)
+  },
+
+  kproxyUpdateConfig: (config: { port?: number; host?: string; autoStart?: boolean }): Promise<{ success: boolean; config?: unknown; error?: string }> => {
+    return ipcRenderer.invoke('kproxy-update-config', config)
+  },
+
+  onKproxyRequest: (callback: (info: { timestamp: number; method: string; host: string; path: string; isMitm: boolean }) => void): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, info: { timestamp: number; method: string; host: string; path: string; isMitm: boolean }): void => {
+      callback(info)
+    }
+    ipcRenderer.on('kproxy-request', handler)
+    return () => { ipcRenderer.removeListener('kproxy-request', handler) }
+  },
+
+  onKproxyStatusChange: (callback: (status: { running: boolean; port: number }) => void): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, status: { running: boolean; port: number }): void => {
+      callback(status)
+    }
+    ipcRenderer.on('kproxy-status-change', handler)
+    return () => { ipcRenderer.removeListener('kproxy-status-change', handler) }
+  },
+
+  onKproxyError: (callback: (error: string) => void): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, error: string): void => {
+      callback(error)
+    }
+    ipcRenderer.on('kproxy-error', handler)
+    return () => { ipcRenderer.removeListener('kproxy-error', handler) }
+  },
+
   // ============ 托盘相关 API ============
 
   // 获取显示主窗口快捷键

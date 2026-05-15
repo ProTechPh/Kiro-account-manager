@@ -6,6 +6,10 @@ import { writeFile, readFile } from 'fs/promises'
 import { encode, decode } from 'cbor-x'
 import icon from '../../resources/icon.png?asset'
 import { ProxyServer, type ProxyAccount, type ProxyConfig } from './proxy'
+import { startTunnel, stopTunnel, getTunnelStatus, setTunnelStatusCallback } from './proxy/tunnel'
+import { initProxyPoolStore, getProxyPools, getProxyPoolById, createProxyPool, updateProxyPool, deleteProxyPool, testProxyPool, deployVercelRelay, batchImportProxies, type ProxyPoolEntry } from './proxy/proxyPool'
+import { hasRootCA, getRootCACertPath, getRootCAFingerprint, installRootCA, uninstallRootCA, checkRootCAInstalled, exportRootCA } from './proxy/mitmCert'
+import { startMitmServer, stopMitmServer, getMitmServerStatus, setMitmStatusCallback, setMitmRequestCallback } from './proxy/mitmServer'
 import { fetchKiroModels, fetchSubscriptionToken, fetchAvailableSubscriptions } from './proxy/kiroApi'
 import { getMachineFingerprint } from './proxy/gatewayUtils'
 import { proxyLogStore } from './proxy/logger'
@@ -4688,6 +4692,166 @@ app.whenReady().then(async () => {
       console.error('[ProxyServer] Reset pool failed:', error)
       return { success: false, error: error instanceof Error ? error.message : 'Failed to reset pool' }
     }
+  })
+
+  // IPC: 启动 Cloudflare Tunnel (公网访问)
+  ipcMain.handle('proxy-tunnel-start', async (_event, port?: number) => {
+    try {
+      const proxyPort = port || proxyServer?.getConfig?.()?.port || 5580
+      const result = await startTunnel(proxyPort)
+      return result
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : 'Failed to start tunnel' }
+    }
+  })
+
+  // IPC: 停止 Cloudflare Tunnel
+  ipcMain.handle('proxy-tunnel-stop', () => {
+    try {
+      stopTunnel()
+      return { success: true }
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : 'Failed to stop tunnel' }
+    }
+  })
+
+  // IPC: 获取 Tunnel 状态
+  ipcMain.handle('proxy-tunnel-status', () => {
+    return getTunnelStatus()
+  })
+
+  // 注册 Tunnel 状态变化回调 → 通知渲染进程
+  setTunnelStatusCallback((status) => {
+    mainWindow?.webContents.send('proxy-tunnel-status-change', status)
+  })
+
+  // ============ Proxy Pool IPC ============
+
+  // 初始化 Proxy Pool store
+  if (store) {
+    initProxyPoolStore(store as any)
+  }
+
+  // IPC: 获取所有 Proxy Pools
+  ipcMain.handle('proxy-pools-list', (_event, filter?: { isActive?: boolean }) => {
+    return { success: true, pools: getProxyPools(filter) }
+  })
+
+  // IPC: 获取单个 Proxy Pool
+  ipcMain.handle('proxy-pools-get', (_event, id: string) => {
+    const pool = getProxyPoolById(id)
+    return pool ? { success: true, pool } : { success: false, error: 'Not found' }
+  })
+
+  // IPC: 创建 Proxy Pool
+  ipcMain.handle('proxy-pools-create', (_event, data: { name: string; proxyUrl: string; noProxy?: string; type?: string; isActive?: boolean; strictProxy?: boolean }) => {
+    try {
+      const pool = createProxyPool(data as any)
+      return { success: true, pool }
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : 'Failed to create' }
+    }
+  })
+
+  // IPC: 更新 Proxy Pool
+  ipcMain.handle('proxy-pools-update', (_event, id: string, data: Partial<ProxyPoolEntry>) => {
+    const pool = updateProxyPool(id, data)
+    return pool ? { success: true, pool } : { success: false, error: 'Not found' }
+  })
+
+  // IPC: 删除 Proxy Pool
+  ipcMain.handle('proxy-pools-delete', (_event, id: string) => {
+    const ok = deleteProxyPool(id)
+    return ok ? { success: true } : { success: false, error: 'Not found' }
+  })
+
+  // IPC: 测试 Proxy Pool
+  ipcMain.handle('proxy-pools-test', async (_event, id: string) => {
+    const result = await testProxyPool(id)
+    return result
+  })
+
+  // IPC: 部署 Vercel Relay
+  ipcMain.handle('proxy-pools-vercel-deploy', async (_event, vercelToken: string, projectName?: string) => {
+    return await deployVercelRelay(vercelToken, projectName)
+  })
+
+  // IPC: 批量导入 Proxies
+  ipcMain.handle('proxy-pools-batch-import', (_event, lines: string[]) => {
+    const result = batchImportProxies(lines)
+    return { success: true, ...result }
+  })
+
+  // ============ MITM Bridge IPC ============
+
+  // IPC: 获取 MITM 状态
+  ipcMain.handle('kproxy-get-status', () => {
+    const serverStatus = getMitmServerStatus()
+    return {
+      running: serverStatus.running,
+      config: { port: serverStatus.port, interceptedHosts: serverStatus.interceptedHosts },
+      stats: {},
+      caInfo: {
+        exists: hasRootCA(),
+        certPath: getRootCACertPath(),
+        fingerprint: getRootCAFingerprint(),
+        installed: checkRootCAInstalled()
+      }
+    }
+  })
+
+  // IPC: 安装 Root CA 证书
+  ipcMain.handle('kproxy-install-ca-cert', () => {
+    return installRootCA()
+  })
+
+  // IPC: 卸载 Root CA 证书
+  ipcMain.handle('kproxy-uninstall-ca-cert', () => {
+    return uninstallRootCA()
+  })
+
+  // IPC: 检查 Root CA 是否已安装
+  ipcMain.handle('kproxy-check-ca-cert-installed', () => {
+    return { success: true, installed: checkRootCAInstalled() }
+  })
+
+  // IPC: 获取 Root CA 证书信息
+  ipcMain.handle('kproxy-get-ca-cert', () => {
+    if (!hasRootCA()) {
+      return { success: false, error: 'Root CA not generated yet' }
+    }
+    const certPem = require('fs').readFileSync(getRootCACertPath(), 'utf8')
+    return {
+      success: true,
+      certPem,
+      certPath: getRootCACertPath(),
+      fingerprint: getRootCAFingerprint()
+    }
+  })
+
+  // IPC: 导出 Root CA 证书
+  ipcMain.handle('kproxy-export-ca-cert', (_event, exportPath?: string) => {
+    return exportRootCA(exportPath)
+  })
+
+  // IPC: 启动/停止 MITM Bridge
+  ipcMain.handle('kproxy-update-config', async (_event, config: any) => {
+    if (config.autoStart === true) {
+      const result = await startMitmServer()
+      return { success: result.success, error: result.error, config: getMitmServerStatus() }
+    } else if (config.autoStart === false) {
+      stopMitmServer()
+      return { success: true, config: getMitmServerStatus() }
+    }
+    return { success: true, config: getMitmServerStatus() }
+  })
+
+  // Register MITM callbacks to notify renderer
+  setMitmStatusCallback((status) => {
+    mainWindow?.webContents.send('kproxy-status-change', { running: status.running, port: status.port })
+  })
+  setMitmRequestCallback((info) => {
+    mainWindow?.webContents.send('kproxy-request', info)
   })
 
   // ============ MCP 服务器管理 IPC ============

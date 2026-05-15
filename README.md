@@ -76,6 +76,31 @@
 - **Web Search Tool Injection**: Auto-inject web_search tool for MCP emulation
 - **Truncation Recovery**: Automatic detection and recovery from truncated API responses
 
+### 🌐 Public Access — Cloudflare Tunnel
+- One-click public URL via Cloudflare Quick Tunnel (no account needed)
+- Free `https://*.trycloudflare.com` URL with valid HTTPS
+- Auto-downloads `cloudflared` binary, real-time status & progress
+- Share your proxy endpoint with anyone on the internet
+
+### 🔀 Proxy Pools — Outbound Proxy & Vercel Relay
+- Manage reusable outbound proxy pools (HTTP/SOCKS)
+- **Vercel Relay**: Deploy edge relay to mask your IP behind Vercel's edge network
+- **Batch Import**: Paste proxy lists in multiple formats
+- Per-pool connectivity test, strict mode, active/inactive toggle
+
+### 📊 Real-Time Quota
+- Live token tracking (input/output) with cost estimation
+- Per-account quota progress bars with color-coded status
+- Reset countdown timer (e.g., "Reset in 4h 30m")
+- Auto-refresh every 60 seconds
+
+### 🛡️ MITM Bridge
+- Intercept Kiro IDE HTTPS traffic on port 443
+- Root CA certificate generation & system trust store installation
+- Dynamic SNI-based leaf certificate generation per domain
+- Forwards intercepted requests to local proxy server
+- Supports: Kiro IDE, Cursor, GitHub Copilot, Antigravity
+
 ---
 
 ## 📸 Screenshots
@@ -124,6 +149,16 @@ npm run typecheck
 ---
 
 ## 📋 Changelog
+
+### v1.8.0
+
+**New Features:**
+- 🌐 **Public Access (Cloudflare Tunnel)**: One-click public URL via `cloudflared` quick tunnel — free HTTPS, no account needed
+- 🔀 **Proxy Pools**: Outbound proxy management with HTTP/SOCKS support, Vercel Relay deployment, batch import
+- 📊 **Real-Time Quota**: Live token tracking, cost estimation, per-account quota progress bars with reset countdown
+- 🛡️ **MITM Bridge**: Intercept IDE HTTPS traffic on port 443 with Root CA generation, dynamic SNI certs, and request forwarding
+
+See full details: `docs/CHANGELOG-v1.8.0.md`
 
 ### v1.7.1
 

@@ -621,6 +621,43 @@ interface KiroApi {
   // 重置 API Key 用量统计
   proxyResetApiKeyUsage: (id: string) => Promise<{ success: boolean; error?: string }>
 
+  // ============ Cloudflare Tunnel API ============
+
+  // 启动 Cloudflare Tunnel
+  proxyTunnelStart: (port?: number) => Promise<{ success: boolean; tunnelUrl?: string; error?: string }>
+
+  // 停止 Cloudflare Tunnel
+  proxyTunnelStop: () => Promise<{ success: boolean; error?: string }>
+
+  // 获取 Tunnel 状态
+  proxyTunnelStatus: () => Promise<{ enabled: boolean; running: boolean; tunnelUrl: string | null; downloading: boolean; downloadProgress: number; error: string | null }>
+
+  // 监听 Tunnel 状态变化
+  onProxyTunnelStatusChange: (callback: (status: { enabled: boolean; running: boolean; tunnelUrl: string | null; downloading: boolean; downloadProgress: number; error: string | null }) => void) => () => void
+
+  // ============ Proxy Pools API ============
+
+  // 获取所有 Proxy Pools
+  proxyPoolsList: (filter?: { isActive?: boolean }) => Promise<{ success: boolean; pools: Array<{ id: string; name: string; proxyUrl: string; noProxy: string; type: string; isActive: boolean; strictProxy: boolean; testStatus: string; lastTestedAt: string | null; lastError: string | null; createdAt: string; updatedAt: string }> }>
+
+  // 创建 Proxy Pool
+  proxyPoolsCreate: (data: { name: string; proxyUrl: string; noProxy?: string; type?: string; isActive?: boolean; strictProxy?: boolean }) => Promise<{ success: boolean; pool?: any; error?: string }>
+
+  // 更新 Proxy Pool
+  proxyPoolsUpdate: (id: string, data: { name?: string; proxyUrl?: string; noProxy?: string; isActive?: boolean; strictProxy?: boolean }) => Promise<{ success: boolean; pool?: any; error?: string }>
+
+  // 删除 Proxy Pool
+  proxyPoolsDelete: (id: string) => Promise<{ success: boolean; error?: string }>
+
+  // 测试 Proxy Pool
+  proxyPoolsTest: (id: string) => Promise<{ ok: boolean; status: number; elapsedMs?: number; error?: string }>
+
+  // 部署 Vercel Relay
+  proxyPoolsVercelDeploy: (vercelToken: string, projectName?: string) => Promise<{ success: boolean; deployUrl?: string; pool?: any; error?: string }>
+
+  // 批量导入 Proxies
+  proxyPoolsBatchImport: (lines: string[]) => Promise<{ success: boolean; created: number; skipped: number; failed: number }>
+
   // 安装 CA 证书到系统信任存储
   kproxyInstallCaCert: () => Promise<{ success: boolean; message?: string; error?: string }>
 

@@ -1066,6 +1066,89 @@ const zh = {
     refreshModelsFailed: '刷新模型失败'
   },
 
+  // 公网访问 (Cloudflare Tunnel)
+  publicAccess: {
+    title: '公网访问',
+    description: '通过 Cloudflare Tunnel 将代理暴露到互联网',
+    disabled: '离线',
+    tunnelConnected: '已连接',
+    tunnelStart: '启动隧道',
+    tunnelStop: '停止隧道',
+    tunnelConnecting: '连接中...',
+    tunnelDownloading: '下载中',
+    tunnelNeedsProxy: '请先启动代理服务器',
+    tunnelPublicUrl: '公网地址 (HTTPS)',
+    tunnelUrlHint: '分享此地址即可从任何地方访问你的代理。通过 Cloudflare 加密。',
+    tunnelHint: '通过 Cloudflare 创建安全隧道（无需账号）。首次使用会下载 cloudflared（约 30MB）。',
+    benefitAnywhere: '随处访问',
+    benefitShare: '团队共享',
+    benefitEncrypted: '端到端加密',
+    benefitNoAccount: '无需账号',
+    securityWarning: '代理已暴露到互联网。请确保设置 API Key 进行身份验证。'
+  },
+
+  // MITM 桥接
+  mitmBridge: {
+    title: 'MITM 桥接',
+    description: '拦截 IDE 流量 — 使用 IDE 订阅连接任意后端',
+    running: '运行中',
+    stopped: '已停止',
+    rootCa: '根 CA 证书',
+    certInstalled: '已被系统信任',
+    certNotInstalled: '未安装 — HTTPS 拦截需要此证书',
+    installCert: '安装',
+    exportCert: '导出',
+    start: '启动桥接',
+    stop: '停止桥接',
+    howTitle: '工作原理',
+    howDesc: '拦截 IDE 工具的 HTTPS 流量，将 API 调用重定向到你的代理服务器。支持模型重映射和多账号路由。',
+    recentRequests: '最近拦截',
+    warning: 'MITM 桥接会修改系统 DNS 并安装根 CA 证书。仅在自己的机器上使用。',
+    adminRequired: '需要以管理员身份运行（端口 443）'
+  },
+
+  // 实时配额
+  quota: {
+    title: '实时配额',
+    description: '实时 Token 追踪、重置倒计时、费用估算',
+    inputTokens: '输入',
+    outputTokens: '输出',
+    estCost: '估算费用',
+    estCostHint: '非实际账单',
+    tokensPerMin: 'Tokens/分',
+    accountQuotas: '账号配额',
+    accounts: '个账号',
+    resetIn: '重置于',
+    noAccounts: '添加活跃账号以查看配额追踪'
+  },
+
+  // 代理池
+  proxyPools: {
+    title: '代理池',
+    description: '出站代理 & Vercel 中继，用于 IP 轮换和区域限制的提供商',
+    add: '添加代理',
+    edit: '编辑代理',
+    vercelRelay: 'Vercel 中继',
+    batchImport: '批量导入',
+    loading: '加载中...',
+    empty: '暂无代理池。添加代理或部署 Vercel 中继。',
+    name: '名称',
+    url: '代理地址',
+    noProxy: '不代理（绕过）',
+    active: '启用',
+    strict: '严格模式',
+    strictHint: '代理不可用时直接失败（不回退到直连）',
+    save: '保存',
+    cancel: '取消',
+    import: '导入',
+    vercelTitle: '部署 Vercel 中继',
+    vercelWhat: '什么是 Vercel 中继？',
+    vercelDesc: '在 Vercel 部署边缘中继函数。请求通过 Vercel 边缘 IP（20+ 地区数百个 IP）转发。提供商无法封锁 Vercel IP。免费额度：100GB/月。',
+    batchTitle: '批量导入代理',
+    batchLabel: '粘贴代理列表（每行一个）',
+    batchHint: '格式：http://user:pass@host:port 或 host:port:user:pass'
+  },
+
   // 账号选择对话框
   accountSelect: {
     title: '选择账号',
