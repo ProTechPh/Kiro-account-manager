@@ -6,6 +6,7 @@ import { writeFile, readFile } from 'fs/promises'
 import { encode, decode } from 'cbor-x'
 import icon from '../../resources/icon.png?asset'
 import { ProxyServer, type ProxyAccount, type ProxyConfig } from './proxy'
+import { runAutoRepair } from './proxy/autoRepair'
 import { startTunnel, stopTunnel, getTunnelStatus, setTunnelStatusCallback } from './proxy/tunnel'
 import { initProxyPoolStore, getProxyPools, getProxyPoolById, createProxyPool, updateProxyPool, deleteProxyPool, testProxyPool, deployVercelRelay, batchImportProxies, type ProxyPoolEntry } from './proxy/proxyPool'
 import { hasRootCA, getRootCACertPath, getRootCAFingerprint, installRootCA, uninstallRootCA, checkRootCAInstalled, exportRootCA } from './proxy/mitmCert'
@@ -1420,6 +1421,33 @@ function createWindow(): void {
         
         await server.start()
         console.log('[ProxyServer] Auto-started successfully on port', savedProxyConfig.port || 5580)
+        
+        // 运行自动修复检查
+        if (savedProxyConfig.autoRepair) {
+          console.log('[ProxyServer] Running auto-repair self-check...')
+          runAutoRepair({
+            getProxyConfig: () => server.getConfig(),
+            updateProxyConfig: (cfg) => server.updateConfig(cfg),
+            saveProxyConfig: (cfg) => { store?.set('proxyConfig', cfg) },
+            startServer: () => server.start(),
+            stopServer: () => server.stop(),
+            isServerRunning: () => server.isRunning(),
+            onRepairLog: (msg, level) => {
+              if (level === 'error') console.error(msg)
+              else if (level === 'warn') console.warn(msg)
+              else console.log(msg)
+            },
+            onRepairComplete: (result) => {
+              console.log('[ProxyServer] Auto-repair result:', result.message)
+              if (result.newApiKey) {
+                // Notify renderer about the new API key
+                mainWindow?.webContents.send('proxy-config-updated', { apiKeyRotated: true })
+              }
+            }
+          }).catch(err => {
+            console.error('[ProxyServer] Auto-repair error:', err)
+          })
+        }
       } catch (error) {
         console.error('[ProxyServer] Auto-start failed:', error)
       }
@@ -1705,6 +1733,122 @@ app.whenReady().then(async () => {
       return { success: true }
     } catch (error) {
       console.error('[Tray] Failed to save settings:', error)
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+    }
+  })
+
+  // ============ 开机自启动 & 自动启动服务器 IPC ============
+
+  // IPC: 获取开机自启动状态
+  ipcMain.handle('get-auto-launch', () => {
+    const settings = app.getLoginItemSettings()
+    return settings.openAtLogin
+  })
+
+  // IPC: 设置开机自启动
+  ipcMain.handle('set-auto-launch', async (_event, enabled: boolean) => {
+    try {
+      app.setLoginItemSettings({
+        openAtLogin: enabled,
+        openAsHidden: true
+      })
+      console.log(`[AutoLaunch] Set openAtLogin to ${enabled}`)
+      return { success: true }
+    } catch (error) {
+      console.error('[AutoLaunch] Failed to set login item settings:', error)
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+    }
+  })
+
+  // IPC: 获取自动启动服务器设置
+  ipcMain.handle('get-auto-start-server', async () => {
+    try {
+      await initStore()
+      if (!store) return false
+      const savedProxyConfig = store.get('proxyConfig') as ProxyConfig | undefined
+      return savedProxyConfig?.autoStart || false
+    } catch (error) {
+      console.error('[AutoStartServer] Failed to get setting:', error)
+      return false
+    }
+  })
+
+  // IPC: 设置自动启动服务器
+  ipcMain.handle('set-auto-start-server', async (_event, enabled: boolean) => {
+    try {
+      await initStore()
+      if (!store) return { success: false, error: 'Store not initialized' }
+      const savedProxyConfig = (store.get('proxyConfig') as ProxyConfig | undefined) || {} as ProxyConfig
+      savedProxyConfig.autoStart = enabled
+      store.set('proxyConfig', savedProxyConfig)
+      console.log(`[AutoStartServer] Set autoStart to ${enabled}`)
+      return { success: true }
+    } catch (error) {
+      console.error('[AutoStartServer] Failed to save setting:', error)
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+    }
+  })
+
+  // IPC: 获取自动修复设置
+  ipcMain.handle('get-auto-repair', async () => {
+    try {
+      await initStore()
+      if (!store) return true // default enabled
+      const savedProxyConfig = store.get('proxyConfig') as ProxyConfig | undefined
+      return savedProxyConfig?.autoRepair !== false // default true
+    } catch (error) {
+      console.error('[AutoRepair] Failed to get setting:', error)
+      return true
+    }
+  })
+
+  // IPC: 设置自动修复
+  ipcMain.handle('set-auto-repair', async (_event, enabled: boolean) => {
+    try {
+      await initStore()
+      if (!store) return { success: false, error: 'Store not initialized' }
+      const savedProxyConfig = (store.get('proxyConfig') as ProxyConfig | undefined) || {} as ProxyConfig
+      savedProxyConfig.autoRepair = enabled
+      store.set('proxyConfig', savedProxyConfig)
+      console.log(`[AutoRepair] Set autoRepair to ${enabled}`)
+      return { success: true }
+    } catch (error) {
+      console.error('[AutoRepair] Failed to save setting:', error)
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+    }
+  })
+
+  // IPC: 手动触发自动修复
+  ipcMain.handle('run-auto-repair', async () => {
+    try {
+      const server = initProxyServer()
+      if (!server.isRunning()) {
+        return { success: false, error: 'Server is not running' }
+      }
+      
+      const result = await runAutoRepair({
+        getProxyConfig: () => server.getConfig(),
+        updateProxyConfig: (cfg) => server.updateConfig(cfg),
+        saveProxyConfig: (cfg) => { store?.set('proxyConfig', cfg) },
+        startServer: () => server.start(),
+        stopServer: () => server.stop(),
+        isServerRunning: () => server.isRunning(),
+        onRepairLog: (msg, level) => {
+          if (level === 'error') console.error(msg)
+          else if (level === 'warn') console.warn(msg)
+          else console.log(msg)
+        },
+        onRepairComplete: (repairResult) => {
+          console.log('[ProxyServer] Manual auto-repair result:', repairResult.message)
+          if (repairResult.newApiKey) {
+            mainWindow?.webContents.send('proxy-config-updated', { apiKeyRotated: true })
+          }
+        }
+      })
+      
+      return { success: result.success, action: result.action, message: result.message }
+    } catch (error) {
+      console.error('[AutoRepair] Manual repair failed:', error)
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
   })

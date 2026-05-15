@@ -1,6 +1,6 @@
 import { useAccountsStore } from '@/store/accounts'
 import { Card, CardContent, CardHeader, CardTitle, Button } from '../ui'
-import { Eye, EyeOff, RefreshCw, Clock, Trash2, Download, Upload, Globe, Repeat, Palette, Moon, Sun, Settings, Database, Layers, UserX, Monitor } from 'lucide-react'
+import { Eye, EyeOff, RefreshCw, Clock, Trash2, Download, Upload, Globe, Repeat, Palette, Moon, Sun, Settings, Database, Layers, UserX, Monitor, Power } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { ExportDialog } from '../accounts/ExportDialog'
 import { useTranslation } from '@/hooks/useTranslation'
@@ -59,6 +59,12 @@ export function SettingsPage() {
   const [shortcutError, setShortcutError] = useState('')
   const [isRecordingShortcut, setIsRecordingShortcut] = useState(false)
 
+  // 启动设置状态
+  const [autoLaunchEnabled, setAutoLaunchEnabled] = useState(false)
+  const [autoStartServerEnabled, setAutoStartServerEnabled] = useState(false)
+  const [autoRepairEnabled, setAutoRepairEnabled] = useState(true)
+  const [startupLoading, setStartupLoading] = useState(true)
+
   // 加载快捷键设置
   useEffect(() => {
     const loadShortcut = async () => {
@@ -85,6 +91,75 @@ export function SettingsPage() {
       }
     } catch (error) {
       setShortcutError(String(error))
+    }
+  }
+
+  // 加载启动设置
+  useEffect(() => {
+    const loadStartupSettings = async () => {
+      try {
+        const [autoLaunch, autoStartServer, autoRepair] = await Promise.all([
+          window.api.getAutoLaunch(),
+          window.api.getAutoStartServer(),
+          window.api.getAutoRepair()
+        ])
+        setAutoLaunchEnabled(autoLaunch)
+        setAutoStartServerEnabled(autoStartServer)
+        setAutoRepairEnabled(autoRepair)
+      } catch (error) {
+        console.error('Failed to load startup settings:', error)
+      } finally {
+        setStartupLoading(false)
+      }
+    }
+    loadStartupSettings()
+  }, [])
+
+  // 切换开机自启动
+  const handleAutoLaunchChange = async () => {
+    const newValue = !autoLaunchEnabled
+    setAutoLaunchEnabled(newValue)
+    try {
+      const result = await window.api.setAutoLaunch(newValue)
+      if (!result.success) {
+        setAutoLaunchEnabled(!newValue) // revert
+        console.error('Failed to set auto launch:', result.error)
+      }
+    } catch (error) {
+      setAutoLaunchEnabled(!newValue) // revert
+      console.error('Failed to set auto launch:', error)
+    }
+  }
+
+  // 切换自动启动服务器
+  const handleAutoStartServerChange = async () => {
+    const newValue = !autoStartServerEnabled
+    setAutoStartServerEnabled(newValue)
+    try {
+      const result = await window.api.setAutoStartServer(newValue)
+      if (!result.success) {
+        setAutoStartServerEnabled(!newValue) // revert
+        console.error('Failed to set auto start server:', result.error)
+      }
+    } catch (error) {
+      setAutoStartServerEnabled(!newValue) // revert
+      console.error('Failed to set auto start server:', error)
+    }
+  }
+
+  // 切换自动修复
+  const handleAutoRepairChange = async () => {
+    const newValue = !autoRepairEnabled
+    setAutoRepairEnabled(newValue)
+    try {
+      const result = await window.api.setAutoRepair(newValue)
+      if (!result.success) {
+        setAutoRepairEnabled(!newValue) // revert
+        console.error('Failed to set auto repair:', result.error)
+      }
+    } catch (error) {
+      setAutoRepairEnabled(!newValue) // revert
+      console.error('Failed to set auto repair:', error)
     }
   }
 
@@ -668,6 +743,73 @@ export function SettingsPage() {
                 <p>• {t('settings.tray.hint1')}</p>
                 <p>• {t('settings.tray.hint2')}</p>
                 <p>• {t('settings.tray.hint3')}</p>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* 启动设置 */}
+      <Card className="border-0 shadow-sm hover:shadow-md transition-shadow duration-200">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-primary/10">
+              <Power className="h-4 w-4 text-primary" />
+            </div>
+            {t('settings.startup.title')}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {startupLoading ? (
+            <div className="text-sm text-muted-foreground">{t('common.loading')}</div>
+          ) : (
+            <>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium">{t('settings.startup.autoLaunch')}</p>
+                  <p className="text-sm text-muted-foreground">{t('settings.startup.autoLaunchDesc')}</p>
+                </div>
+                <Button
+                  variant={autoLaunchEnabled ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={handleAutoLaunchChange}
+                >
+                  {autoLaunchEnabled ? t('common.on') : t('common.off')}
+                </Button>
+              </div>
+
+              <div className="flex items-center justify-between pt-2 border-t">
+                <div>
+                  <p className="font-medium">{t('settings.startup.autoStartServer')}</p>
+                  <p className="text-sm text-muted-foreground">{t('settings.startup.autoStartServerDesc')}</p>
+                </div>
+                <Button
+                  variant={autoStartServerEnabled ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={handleAutoStartServerChange}
+                >
+                  {autoStartServerEnabled ? t('common.on') : t('common.off')}
+                </Button>
+              </div>
+
+              <div className="flex items-center justify-between pt-2 border-t">
+                <div>
+                  <p className="font-medium">{t('settings.startup.autoRepair')}</p>
+                  <p className="text-sm text-muted-foreground">{t('settings.startup.autoRepairDesc')}</p>
+                </div>
+                <Button
+                  variant={autoRepairEnabled ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={handleAutoRepairChange}
+                >
+                  {autoRepairEnabled ? t('common.on') : t('common.off')}
+                </Button>
+              </div>
+
+              <div className="text-xs text-muted-foreground bg-muted/50 rounded-lg p-3 space-y-1">
+                <p>• {t('settings.startup.hint1')}</p>
+                <p>• {t('settings.startup.hint2')}</p>
+                <p>• {t('settings.startup.hint3')}</p>
               </div>
             </>
           )}

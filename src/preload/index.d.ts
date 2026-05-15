@@ -798,6 +798,31 @@ interface KiroApi {
 
   // 监听凭证自动导入事件
   onCredentialsAutoImported: (callback: (data: { authMethod: string; provider?: string; region: string; expiresAt: number }) => void) => () => void
+
+  // ============ 启动设置 API ============
+
+  // 获取开机自启动状态
+  getAutoLaunch: () => Promise<boolean>
+
+  // 设置开机自启动
+  setAutoLaunch: (enabled: boolean) => Promise<{ success: boolean; error?: string }>
+
+  // 获取自动启动服务器设置
+  getAutoStartServer: () => Promise<boolean>
+
+  // 设置自动启动服务器
+  setAutoStartServer: (enabled: boolean) => Promise<{ success: boolean; error?: string }>
+
+  // ============ 自动修复 API ============
+
+  // 获取自动修复设置
+  getAutoRepair: () => Promise<boolean>
+
+  // 设置自动修复
+  setAutoRepair: (enabled: boolean) => Promise<{ success: boolean; error?: string }>
+
+  // 手动触发自动修复
+  runAutoRepair: () => Promise<{ success: boolean; action?: string; message?: string; error?: string }>
 }
 
 declare global {

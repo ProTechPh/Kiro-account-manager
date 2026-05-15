@@ -522,6 +522,18 @@ const zh = {
       hint2: '右键托盘图标可以显示菜单',
       hint3: '托盘菜单可以查看当前账户信息和用量'
     },
+    startup: {
+      title: '启动设置',
+      autoLaunch: '开机自启动',
+      autoLaunchDesc: '开启后应用将在系统启动时自动运行',
+      autoStartServer: '自动启动服务器',
+      autoStartServerDesc: '开启后应用打开时会自动启动代理服务器',
+      autoRepair: '自动修复',
+      autoRepairDesc: '启动/重启时自动检测并恢复服务。检测到 401 时自动轮换 Proxy API Key。',
+      hint1: '开机自启动会将应用添加到系统登录项',
+      hint2: '自动启动服务器会在应用打开时立即启动代理服务',
+      hint3: '自动修复会运行连通性自检并从常见错误中恢复'
+    },
     shortcuts: {
       title: '快捷键',
       showWindow: '显示主窗口',

@@ -520,6 +520,18 @@ const en = {
       hint2: 'Right-click tray icon to show menu',
       hint3: 'Tray menu shows current account info and usage'
     },
+    startup: {
+      title: 'Startup',
+      autoLaunch: 'Launch at Startup',
+      autoLaunchDesc: 'Automatically start the app when your system boots',
+      autoStartServer: 'Auto-Start Server',
+      autoStartServerDesc: 'Automatically start the proxy server when the app opens',
+      autoRepair: 'Auto Repair',
+      autoRepairDesc: 'Automatically detect and recover the service on start/restart. If 401 is detected, rotate Proxy API Key automatically.',
+      hint1: 'Launch at Startup will add the app to your system login items',
+      hint2: 'Auto-Start Server will start the proxy service immediately when the app opens',
+      hint3: 'Auto Repair runs a connectivity self-check and recovers from common errors'
+    },
     shortcuts: {
       title: 'Keyboard Shortcuts',
       showWindow: 'Show Window',

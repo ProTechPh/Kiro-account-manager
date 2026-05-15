@@ -101,6 +101,11 @@
 - Forwards intercepted requests to local proxy server
 - Supports: Kiro IDE, Cursor, GitHub Copilot, Antigravity
 
+### ⚡ Startup & Auto Repair
+- **Launch at Startup**: Automatically start the app when your system boots
+- **Auto-Start Server**: Automatically start the proxy server when the app opens
+- **Auto Repair**: Connectivity self-check on start/restart — detects 401 and rotates Proxy API Key automatically, restarts on unresponsive service
+
 ---
 
 ## 📸 Screenshots
@@ -149,6 +154,15 @@ npm run typecheck
 ---
 
 ## 📋 Changelog
+
+### v1.8.1
+
+**New Features:**
+- ⚡ **Launch at Startup**: Automatically start the app when your system boots (native OS login item)
+- 🚀 **Auto-Start Server**: Automatically start the proxy server when the app opens (Settings toggle)
+- 🛠️ **Auto Repair**: Connectivity self-check on start/restart — probes `/v1/models`, rotates API key on 401, restarts on unresponsive service
+
+See full details: `docs/CHANGELOG-v1.8.1.md`
 
 ### v1.8.0
 

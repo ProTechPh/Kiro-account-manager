@@ -367,6 +367,9 @@ export interface ProxyConfig {
   firstTokenMaxRetries?: number
   // 流式响应读取超时（秒，默认 300 = 5分钟）
   streamingReadTimeout?: number
+  // ============ Auto Repair 配置 ============
+  // 自动修复：启动/重启时自动检测并恢复服务
+  autoRepair?: boolean
   // ============ Web Search 配置 ============
   // 自动注入 web_search 工具（默认 false）
   webSearchEnabled?: boolean

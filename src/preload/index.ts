@@ -954,6 +954,37 @@ const api = {
     return () => {
       ipcRenderer.removeListener('credentials-auto-imported', handler)
     }
+  },
+
+  // 开机自启动
+  getAutoLaunch: (): Promise<boolean> => {
+    return ipcRenderer.invoke('get-auto-launch')
+  },
+
+  setAutoLaunch: (enabled: boolean): Promise<{ success: boolean; error?: string }> => {
+    return ipcRenderer.invoke('set-auto-launch', enabled)
+  },
+
+  // 自动启动服务器
+  getAutoStartServer: (): Promise<boolean> => {
+    return ipcRenderer.invoke('get-auto-start-server')
+  },
+
+  setAutoStartServer: (enabled: boolean): Promise<{ success: boolean; error?: string }> => {
+    return ipcRenderer.invoke('set-auto-start-server', enabled)
+  },
+
+  // 自动修复
+  getAutoRepair: (): Promise<boolean> => {
+    return ipcRenderer.invoke('get-auto-repair')
+  },
+
+  setAutoRepair: (enabled: boolean): Promise<{ success: boolean; error?: string }> => {
+    return ipcRenderer.invoke('set-auto-repair', enabled)
+  },
+
+  runAutoRepair: (): Promise<{ success: boolean; action?: string; message?: string; error?: string }> => {
+    return ipcRenderer.invoke('run-auto-repair')
   }
 }
 
